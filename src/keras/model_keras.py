@@ -36,8 +36,7 @@ def make_layers_keras(block, no_relu_layers,prelu_layers = []):
         if 'pool' in layer_name:
             # layer = nn.MaxPool2d(kernel_size=v[0], stride=v[1],
             #                         padding=v[2])
-            layer = keras.layers.MaxPooling2D(
-    pool_size=v[0], strides=v[1], padding='same' if v[2]==1 else 'valid')
+            layer = keras.layers.MaxPooling2D(pool_size=v[0], strides=v[1], padding='same' if v[2]==1 else 'valid')
             layers.append((layer_name, layer))
         else:
             # ('conv2_1', [64, 128, 3, 1, 1]),
@@ -46,7 +45,7 @@ def make_layers_keras(block, no_relu_layers,prelu_layers = []):
             #                    padding=v[4])
             #conv = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=4, stride=1, padding=1)
             #model.add(Conv2D(filters=64, kernel_size=(4, 4), strides=(1, 1), padding='same', input_shape=(None, None, 3)))
-            conv2d=keras.layers.Conv2D(filters=v[1], kernel_size=(v[2], v[2]), strides=(v[3],v[3]),padding='same' if v[4]==1 else 'valid', activation='relu',input_shape=(None, None, v[0]))
+            conv2d=keras.layers.Conv2D(filters=v[1], kernel_size=(v[2], v[2]), strides=(v[3],v[3]),padding='same' if v[4]==1 else 'valid', input_shape=(None, None, v[0]))
             layers.append((layer_name, conv2d))
             if layer_name not in no_relu_layers:
                 if layer_name not in prelu_layers:
@@ -54,13 +53,13 @@ def make_layers_keras(block, no_relu_layers,prelu_layers = []):
                     layers.append(('relu_'+layer_name, ReLU()))
                 else:
                     # layers.append(('prelu'+layer_name[4:],nn.PReLU(v[1])))
-                    layers.append(('prelu'+layer_name[4:],PReLU(alpha_initializer=v[1], shared_axes=[1, 2])))
+                    layers.append(('prelu'+layer_name[4:],PReLU(alpha_initializer='zeros', shared_axes=[1, 2])))
 
     return Sequential([t[1] for t in layers]);#nn.Sequential(OrderedDict(layers))
 
 
 def make_layers_Mconv_keras(block,no_relu_layers):
-    model = Sequential()
+    # model = []
     for layer_name, v in block.items():
         layers = []
         if 'pool' in layer_name:
@@ -73,19 +72,23 @@ def make_layers_Mconv_keras(block,no_relu_layers):
             #                    kernel_size=v[2], stride=v[3],
             #                    padding=v[4])
 
-            conv2d=Conv2D(filters=v[1], kernel_size=(v[2],v[2]), strides=v[3], padding='same' if v[4] == 0 else 'valid', input_shape=(None, None, v[0]))
+            conv2d=Conv2D(filters=v[1], kernel_size=(v[2],v[2]), strides=(v[3],v[3]), padding='same' if v[4] == 1 else 'valid', input_shape=(None, None, v[0]))
             layers.append((layer_name, conv2d))
             if layer_name not in no_relu_layers:
-                layers.append(('Mprelu'+layer_name[5:], nn.PReLU(v[1])))
+                layers.append(('Mprelu'+layer_name[5:], PReLU(alpha_initializer='zeros', shared_axes=[1, 2])))
 
-        for layer in [t[1] for t in layers]:
-            model.add(layer)
+        # for layer in [t[1] for t in layers]:
+        #     model.append(layer)
         #modules.append(nn.Sequential(OrderedDict(layers)))
-    return [t[1] for t in layers]#model#nn.ModuleList(modules)
+    return Sequential([t[1] for t in layers])#model#nn.ModuleList(modules)
 
-class bodypose_25_model_keras(keras.Model):
-    def __init__(self):
-        super(bodypose_25_model_keras,self).__init__()
+class bodypose_25_model(keras.Model):
+    def __init__(
+        self,
+        name="bodypose_25_model",
+        **kwargs
+    ):
+        super().__init__(name=name, **kwargs)
         # these layers have no relu layer
         no_relu_layers = ['Mconv7_stage0_L1','Mconv7_stage0_L2',\
                           'Mconv7_stage1_L1', 'Mconv7_stage1_L2',\
@@ -226,9 +229,13 @@ class bodypose_25_model_keras(keras.Model):
 
 
 class bodypose_model(keras.Model):
-    def __init__(self):
-        super(bodypose_model, self).__init__()
-
+    def __init__(
+        self,
+        name="handpose_model",
+        **kwargs
+    ):
+        super().__init__(name=name, **kwargs)
+        
         # these layers have no relu layer
         no_relu_layers = ['conv5_5_CPM_L1', 'conv5_5_CPM_L2', 'Mconv7_stage2_L1',\
                           'Mconv7_stage2_L2', 'Mconv7_stage3_L1', 'Mconv7_stage3_L2',\
@@ -349,9 +356,12 @@ class bodypose_model(keras.Model):
         return out6_1, out6_2
 
 class handpose_model(keras.Model):
-    def __init__(self):
-        super(handpose_model, self).__init__()
-
+    def __init__(
+        self,
+        name="handpose_model",
+        **kwargs
+    ):
+        super().__init__(name=name, **kwargs)
         # these layers have no relu layer
         no_relu_layers = ['conv6_2_CPM', 'Mconv7_stage2', 'Mconv7_stage3',\
                           'Mconv7_stage4', 'Mconv7_stage5', 'Mconv7_stage6']

@@ -7,11 +7,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 import torch
 from torchvision import transforms
-from torchinfo import summary
 from src import util
-#from src.model import bodypose_model, bodypose_25_model
-from src.model import bodypose_model, bodypose_25_model
-
+from src.keras.model_keras import bodypose_model, bodypose_25_model
 
 
 class Body(object):
@@ -35,8 +32,6 @@ class Body(object):
         #     self.model = self.model.cuda()
         # else:
         #     print('cuda is not available')
-
-        
         #model_dict = util.transfer(self.model, torch.load(model_path))
         
         #self.model.load_state_dict(model_dict)

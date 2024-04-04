@@ -13,6 +13,11 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import NamedTuple
+from torchinfo import summary
+import src.keras.body as kerasBody
+import src.keras.hand as kerasHand
+
+from keras import Input
 
 
 class FFProbeResult(NamedTuple):
@@ -39,14 +44,43 @@ from src import model
 from src import util
 from src.body import Body
 from src.hand import Hand
+import torch
 
 model_type = 'body25'  # 'coco'  #  
 if model_type=='body25':
     model_path = './model/pose_iter_584000.caffemodel.pt'
 else:
     model_path = './model/body_pose_model.pth'
-body_estimation = Body(model_path, model_type)
-hand_estimation = Hand('model/hand_pose_model.pth')
+body_estimation_pytorch = Body(model_path, model_type)
+hand_estimation_pytorch = Hand('model/hand_pose_model.pth')
+
+body_estimation_keras = kerasBody.Body(model_path, model_type)
+hand_estimation_keras = kerasHand.Hand('model/hand_pose_model.pth')
+
+input_shape = (3,640,480)  # Batch size, channels, height, width
+input_shape_keras = Input(shape=(3,640,480))
+
+# Create a dummy input tensor with the specified shape
+dummy_input = torch.randn(input_shape)
+
+print("Pytorch summary")
+summary(body_estimation_pytorch.model)
+print("End Pytorch summary")
+
+print("Pytorch summary")
+summary(hand_estimation_pytorch.model)
+print("End Pytorch summary")
+
+print("Keras hand_estimation_pytorch summary")
+print(type(hand_estimation_keras.model))
+hand_estimation_keras.model.summary(expand_nested=True)
+print("End Keras summary")
+
+print("Keras summary")
+print(type(body_estimation_keras.model))
+
+body_estimation_keras.model.summary(expand_nested=True)
+print("End Keras summary")
 
 # def process_frame(frame, body=True, hands=True):
 #     canvas = copy.deepcopy(frame)
