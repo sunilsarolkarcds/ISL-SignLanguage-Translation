@@ -45,7 +45,7 @@ def make_layers_keras(block, no_relu_layers,prelu_layers = []):
             #                    padding=v[4])
             #conv = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=4, stride=1, padding=1)
             #model.add(Conv2D(filters=64, kernel_size=(4, 4), strides=(1, 1), padding='same', input_shape=(None, None, 3)))
-            conv2d=keras.layers.Conv2D(filters=v[1], kernel_size=(v[2], v[2]), strides=(v[3],v[3]),padding='same' if v[4]==1 else 'valid', input_shape=(None, None, v[0]))
+            conv2d=keras.layers.Conv2D(filters=v[1], kernel_size=v[2], strides=v[3],padding='same' if v[4]==1 else 'valid', input_shape=(None, None, v[0]))
             layers.append((layer_name, conv2d))
             if layer_name not in no_relu_layers:
                 if layer_name not in prelu_layers:
@@ -60,8 +60,8 @@ def make_layers_keras(block, no_relu_layers,prelu_layers = []):
 
 def make_layers_Mconv_keras(block,no_relu_layers):
     # model = []
-    for layer_name, v in block.items():
-        layers = []
+    layers = []
+    for layer_name, v in block.items():        
         if 'pool' in layer_name:
             # layer = nn.MaxPool2d(kernel_size=v[0], stride=v[1],
             #                         padding=v[2])
