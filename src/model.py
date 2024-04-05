@@ -4,8 +4,6 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 
-
-
 # def make_layers(block, no_relu_layers):
 #     layers = []
 #     for layer_name, v in block.items():
@@ -26,12 +24,14 @@ import torch.nn as nn
 
 def make_layers(block, no_relu_layers,prelu_layers = []):
     layers = []
+    
     for layer_name, v in block.items():
         if 'pool' in layer_name:
             layer = nn.MaxPool2d(kernel_size=v[0], stride=v[1],
                                     padding=v[2])
             layers.append((layer_name, layer))
         else:
+            #[3, 64, 3, 1, 1]
             conv2d = nn.Conv2d(in_channels=v[0], out_channels=v[1],
                                kernel_size=v[2], stride=v[3],
                                padding=v[4])
@@ -294,10 +294,6 @@ class bodypose_model(nn.Module):
         self.model5_2 = blocks['block5_2']
         self.model6_2 = blocks['block6_2']
 
-        #freezing model parameters
-        for param in self.parameters():
-            param.requires_grad=False
-
 
     def forward(self, x):
 
@@ -403,5 +399,4 @@ class handpose_model(nn.Module):
         concat_stage6 = torch.cat([out_stage5, out1_0], 1)
         out_stage6 = self.model6(concat_stage6)
         return out_stage6
-
 

@@ -27,6 +27,14 @@ class Body(object):
             self.njoint = 19
             self.npaf = 38
         self.model_type = model_type
+
+        pytorch_weights = torch.load(model_path)
+
+        # Load weights into Keras model
+        for layer in self.model.layers:
+            if layer.name in pytorch_weights:
+                weights = pytorch_weights[layer.name].numpy()
+                layer.set_weights(weights)
         # if torch.cuda.is_available():
         #     print('cuda is available')
         #     self.model = self.model.cuda()
