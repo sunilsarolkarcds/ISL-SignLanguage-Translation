@@ -54,8 +54,8 @@ else:
 body_estimation_pytorch = Body(model_path, model_type)
 hand_estimation_pytorch = Hand('model/hand_pose_model.pth')
 
-body_estimation_keras = kerasBody.Body(model_path, model_type)
-hand_estimation_keras = kerasHand.Hand('model/hand_pose_model.pth')
+# body_estimation_keras = kerasBody.Body(model_path, model_type)
+# hand_estimation_keras = kerasHand.Hand('model/hand_pose_model.pth')
 
 input_shape = (3,640,480)  # Batch size, channels, height, width
 input_shape_keras = Input(shape=(3,640,480))
@@ -64,117 +64,29 @@ input_shape_keras = Input(shape=(3,640,480))
 dummy_input = torch.randn(input_shape)
 
 print("Pytorch summary")
-summary(body_estimation_pytorch.model)
+summary_body_estimation=summary(body_estimation_pytorch.model)
+
+print('input names-')
+
+input_names = summary_body_estimation.input_size[0]  # Assuming single input
+print(f"Input Names: {input_names}")
 print("End Pytorch summary")
 
-print("Pytorch summary")
-summary(hand_estimation_pytorch.model)
-print("End Pytorch summary")
+# print("Pytorch summary")
+# summary(hand_estimation_pytorch.model)
+# print("End Pytorch summary")
 
-print("Keras hand_estimation_pytorch summary")
-print(type(hand_estimation_keras.model))
-hand_estimation_keras.model.summary(expand_nested=True)
-print("End Keras summary")
+# print("Keras hand_estimation_pytorch summary")
+# print(type(hand_estimation_keras.model))
+# hand_estimation_keras.model.summary(expand_nested=True)
+# print("End Keras summary")
 
-print("Keras summary")
-print(type(body_estimation_keras.model))
+# print("Keras summary")
+# print(type(body_estimation_keras.model))
 
-body_estimation_keras.model.summary(expand_nested=True)
-print("End Keras summary")
-
-# def process_frame(frame, body=True, hands=True):
-#     canvas = copy.deepcopy(frame)
-#     if body:
-#         candidate, subset = body_estimation(frame)
-#         canvas = util.draw_bodypose(canvas, candidate, subset, model_type)
-#     if hands:
-#         hands_list = util.handDetect(candidate, subset, frame)
-#         all_hand_peaks = []
-#         for x, y, w, is_left in hands_list:
-#             peaks = hand_estimation(frame[y:y+w, x:x+w, :])
-#             peaks[:, 0] = np.where(peaks[:, 0]==0, peaks[:, 0], peaks[:, 0]+x)
-#             peaks[:, 1] = np.where(peaks[:, 1]==0, peaks[:, 1], peaks[:, 1]+y)
-#             all_hand_peaks.append(peaks)
-#         canvas = util.draw_handpose(canvas, all_hand_peaks)
-#     return canvas
-
-# # writing video with ffmpeg because cv2 writer failed
-# # https://stackoverflow.com/questions/61036822/opencv-videowriter-produces-cant-find-starting-number-error
-# import ffmpeg
-
-# # open specified video
-# parser = argparse.ArgumentParser(
-#         description="Process a video annotating poses detected.")
-# parser.add_argument('file', type=str, help='Video file location to process.')
-# parser.add_argument('--no_hands', action='store_true', help='No hand pose')
-# parser.add_argument('--no_body', action='store_true', help='No body pose')
-# args = parser.parse_args()
-# video_file = args.file
-# cap = cv2.VideoCapture(video_file)
-
-# # get video file info
-# ffprobe_result = ffprobe(args.file)
-# info = json.loads(ffprobe_result.json)
-# videoinfo = [i for i in info["streams"] if i["codec_type"] == "video"][0]
-# input_fps = videoinfo["avg_frame_rate"]
-# # input_fps = float(input_fps[0])/float(input_fps[1])
-# input_pix_fmt = videoinfo["pix_fmt"]
-# input_vcodec = videoinfo["codec_name"]
-
-# # define a writer object to write to a movidified file
-# postfix = info["format"]["format_name"].split(",")[0]
-# output_file = ".".join(video_file.split(".")[:-1])+".processed." + postfix
+# body_estimation_keras.model.summary(expand_nested=True)
+# print("End Keras summary")
 
 
-# class Writer():
-#     def __init__(self, output_file, input_fps, input_framesize, input_pix_fmt,
-#                  input_vcodec):
-#         if os.path.exists(output_file):
-#             os.remove(output_file)
-#         self.ff_proc = (
-#             ffmpeg
-#             .input('pipe:',
-#                    format='rawvideo',
-#                    pix_fmt="bgr24",
-#                    s='%sx%s'%(input_framesize[1],input_framesize[0]),
-#                    r=input_fps)
-#             .output(output_file, pix_fmt=input_pix_fmt, vcodec=input_vcodec)
-#             .overwrite_output()
-#             .run_async(pipe_stdin=True)
-#         )
-
-#     def __call__(self, frame):
-#         self.ff_proc.stdin.write(frame.tobytes())
-
-#     def close(self):
-#         self.ff_proc.stdin.close()
-#         self.ff_proc.wait()
-
-
-# writer = None
-# while(cap.isOpened()):
-#     ret, frame = cap.read()
-#     if frame is None:
-#         break
-
-#     posed_frame = process_frame(frame, body=not args.no_body,
-#                                        hands=not args.no_hands)
-
-#     if writer is None:
-#         input_framesize = posed_frame.shape[:2]
-#         writer = Writer(output_file, input_fps, input_framesize, input_pix_fmt,
-#                         input_vcodec)
-
-#     cv2.imshow('frame', posed_frame)
-
-#     # write the frame
-#     writer(posed_frame)
-
-#     if cv2.waitKey(1) & 0xFF == ord('q'):
-#         break
-
-# cap.release()
-# writer.close()
-# cv2.destroyAllWindows()
 
 print("Finished")

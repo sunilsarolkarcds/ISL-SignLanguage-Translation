@@ -1,6 +1,7 @@
 import onnx
 
-from keras2onnx import convert_keras
+
+from onnx2keras import onnx_to_keras
 
 from src.body import Body
 from src.hand import Hand
@@ -24,7 +25,7 @@ torch.onnx.export(model=body_estimation_pytorch.model,args=dummy_input, f='model
 
 onnx_model = onnx.load('model/bodypose_25_model.onnx')
 
-keras_model = convert_keras(onnx_model)
+keras_model = onnx_to_keras(onnx_model,['model0.conv1_1'])
 
 # Save the Keras model
 keras_model.save("model.h5")
