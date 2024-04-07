@@ -20,12 +20,13 @@ class ISLSignPos(keras.Model):
         self.npaf_body = 52
 
     def call(self, oriImg):
-        candidate, subset = self.bodypos(oriImg.numpy())
+        oriImgLocal=oriImg.cpu()
+        candidate, subset = self.bodypos(oriImgLocal.numpy())
         # handpos = self.pt_hand(inputs)
-        hands_list = util.handDetect(candidate, subset, oriImg.numpy())
+        hands_list = util.handDetect(candidate, subset, oriImgLocal.numpy())
         all_hand_peaks = []
         for x, y, w, is_left in hands_list:
-            peaks = self.handpos(oriImg[y:y+w, x:x+w, :])
+            peaks = self.handpos(oriImgLocal[y:y+w, x:x+w, :])
             peaks[:, 0] = np.where(peaks[:, 0]==0, peaks[:, 0], peaks[:, 0]+x)
             peaks[:, 1] = np.where(peaks[:, 1]==0, peaks[:, 1], peaks[:, 1]+y)
             all_hand_peaks.append(peaks)
