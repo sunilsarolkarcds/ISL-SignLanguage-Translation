@@ -20,7 +20,9 @@ class ISLSignPos(keras.Model):
         self.npaf_body = 52
 
     def call(self, oriImg):
+        print(type(oriImg))
         oriImgLocal=oriImg.cpu()
+        print(type(oriImgLocal))
         candidate, subset = self.bodypos(oriImgLocal.numpy())
         # handpos = self.pt_hand(inputs)
         hands_list = util.handDetect(candidate, subset, oriImgLocal.numpy())
