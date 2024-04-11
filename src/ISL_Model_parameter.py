@@ -27,6 +27,7 @@ class ISLSignPos(keras.Model):
         print(type(oriImgLocal))
 
         if oriImg.shape[0]<4:
+            print("resizing image from CHW to HWC")
             oriImgLocal=oriImgLocal.permute(1, 2, 0)
         candidate, subset = self.bodypos(oriImgLocal.numpy())
         # handpos = self.pt_hand(inputs)
