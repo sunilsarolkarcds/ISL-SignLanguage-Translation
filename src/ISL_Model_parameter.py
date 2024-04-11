@@ -21,8 +21,13 @@ class ISLSignPos(keras.Model):
 
     def call(self, oriImg):
         print(type(oriImg))
+
+        
         oriImgLocal=oriImg.cpu()
         print(type(oriImgLocal))
+
+        if oriImg.shape[0]<4:
+            oriImgLocal=oriImgLocal.permute(1, 2, 0)
         candidate, subset = self.bodypos(oriImgLocal.numpy())
         # handpos = self.pt_hand(inputs)
         hands_list = util.handDetect(candidate, subset, oriImgLocal.numpy())
