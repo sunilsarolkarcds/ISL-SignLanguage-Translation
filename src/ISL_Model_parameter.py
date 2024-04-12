@@ -27,7 +27,7 @@ class ISLSignPos(keras.Model):
         print(type(oriImgLocal))
 
         if oriImg.shape[0]<4:
-            print("resizing image from CHW to HWC")
+            # print("resizing image from CHW to HWC")
             oriImgLocal=oriImgLocal.permute(1, 2, 0)
         candidate, subset = self.bodypos(oriImgLocal.numpy())
         # handpos = self.pt_hand(inputs)
@@ -35,7 +35,7 @@ class ISLSignPos(keras.Model):
         all_hand_peaks = []
         for x, y, w, is_left in hands_list:
             if oriImgLocal.shape[0]<4:
-                print("resizing image from CHW to HWC")
+                # print("resizing image from CHW to HWC")
                 oriImgLocal=oriImgLocal.permute(1, 2, 0)
             peaks = self.handpos(oriImgLocal.numpy()[y:y+w, x:x+w, :])
             peaks[:, 0] = np.where(peaks[:, 0]==0, peaks[:, 0], peaks[:, 0]+x)
@@ -46,7 +46,7 @@ class ISLSignPos(keras.Model):
     
     def bodypos(self, oriImg):
         # scale_search = [0.5, 1.0, 1.5, 2.0]
-        print("type(oriImg)",type(oriImg))
+        # print("type(oriImg)",type(oriImg))
         model_type = 'body25'
         scale_search = [0.5]
         boxsize = 368
