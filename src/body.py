@@ -30,6 +30,8 @@ class Body(object):
         self.model_type = model_type
         if torch.cuda.is_available():
             self.model = self.model.cuda()
+
+        
         model_dict = util.transfer(self.model, torch.load(model_path))
         self.model.load_state_dict(model_dict)
         self.model.eval()

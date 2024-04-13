@@ -164,6 +164,8 @@ class bodypose_25_model(nn.Module):
             blocks[k] = make_layers_Mconv(blocks[k], no_relu_layers)
         self.models = nn.ModuleDict(blocks)
         #self.model_L2_S0_mconv1 = blocks['Mconv1_stage0_L2']
+        for param in self.parameters():
+            param.requires_grad = False
             
         
     def _Mconv_forward(self,x,models):
@@ -384,6 +386,8 @@ class handpose_model(nn.Module):
         self.model4 = blocks['block4']
         self.model5 = blocks['block5']
         self.model6 = blocks['block6']
+        for param in self.parameters():
+            param.requires_grad = False
 
     def forward(self, x):
         out1_0 = self.model1_0(x)
@@ -399,4 +403,3 @@ class handpose_model(nn.Module):
         concat_stage6 = torch.cat([out_stage5, out1_0], 1)
         out_stage6 = self.model6(concat_stage6)
         return out_stage6
-
