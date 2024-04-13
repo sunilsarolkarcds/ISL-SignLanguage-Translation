@@ -53,8 +53,6 @@ class sign_pose(nn.Module):
         padValue = 128
         thre1 = 0.1
         thre2 = 0.05
-        if oriImg.shape[0]<4:
-            oriImg=oriImg.permute(1, 2, 0)
 
         multiplier = [x * boxsize / oriImg.shape[0] for x in scale_search]
         heatmap_avg = np.zeros((oriImg.shape[0], oriImg.shape[1], self.njoint))
