@@ -23,10 +23,10 @@ import torch.nn as nn
 from src import util
 
 class sign_pose(nn.Module):
-    def __init__(self,handpose,bosypose):
+    def __init__(self,handpose,bodypose):
         super(sign_pose,self).__init__()
         self.handpose=handpose
-        self.bosypose=bosypose
+        self.bodypose=bodypose
         self.njoint = 26
         self.npaf = 52
         self.model_type='body25'
@@ -70,7 +70,7 @@ class sign_pose(nn.Module):
                 data = data.cuda()
             # data = data.permute([2, 0, 1]).unsqueeze(0).float()
             with torch.no_grad():
-                Mconv7_stage6_L1, Mconv7_stage6_L2 = self.bosypose(data)
+                Mconv7_stage6_L1, Mconv7_stage6_L2 = self.bodypose(data)
             Mconv7_stage6_L1 = Mconv7_stage6_L1.cpu().numpy()
             Mconv7_stage6_L2 = Mconv7_stage6_L2.cpu().numpy()
 

@@ -85,7 +85,10 @@ def draw_bodypose(canvas, candidate, subset, model_type='coco'):
             mY = np.mean(Y)
             length = ((X[0] - X[1]) ** 2 + (Y[0] - Y[1]) ** 2) ** 0.5
             angle = math.degrees(math.atan2(X[0] - X[1], Y[0] - Y[1]))
+            # print('original (mX,mY,length,angle)',(mX,mY,length,angle))
+            # print(f'original cv2.ellipse2Poly((int({mY}), int({mX})), (int({length} / 2), {stickwidth}), int({angle}), 0, 360, 1)')
             polygon = cv2.ellipse2Poly((int(mY), int(mX)), (int(length / 2), stickwidth), int(angle), 0, 360, 1)
+            # print(f'cv2.fillConvexPoly(cur_canvas, polygon, colors[i])')
             cv2.fillConvexPoly(cur_canvas, polygon, colors[i])
             canvas = cv2.addWeighted(canvas, 0.4, cur_canvas, 0.6, 0)
     # plt.imsave("preview.jpg", canvas[:, :, [2, 1, 0]])
@@ -93,7 +96,7 @@ def draw_bodypose(canvas, candidate, subset, model_type='coco'):
     return canvas
 #subsets [[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, -1.0, 11.0, 12.0, -1.0, 13.0, 14.0, 15.0, 16.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 26.650803712300775, 17.0]]
 #candidates [[983.0, 172.0, 0.8991263508796692, 0.0], [980.0, 352.0, 0.930037796497345, 1.0], [848.0, 342.0, 0.8652207255363464, 2.0], [811.0, 598.0, 0.8107873797416687, 3.0], [806.0, 817.0, 0.7464589476585388, 4.0], [1120.0, 361.0, 0.8538270592689514, 5.0], [1148.0, 601.0, 0.6797391176223755, 6.0], [1149.0, 834.0, 0.5189468264579773, 7.0], [968.0, 757.0, 0.6468111276626587, 8.0], [876.0, 756.0, 0.6387956142425537, 9.0], [854.0, 1072.0, 0.4211728572845459, 10.0], [1057.0, 759.0, 0.6311940550804138, 11.0], [1038.0, 1072.0, 0.38531172275543213, 12.0], [955.0, 146.0, 0.925083339214325, 13.0], [1016.0, 151.0, 0.9023998379707336, 14.0], [909.0, 167.0, 0.9096773862838745, 15.0], [1057.0, 173.0, 0.8605436086654663, 16.0]]
-def get_bodypose(candidate, subset, model_type='coco'):
+def  get_bodypose(candidate, subset, model_type='coco'):
     stickwidth = 4
     if model_type == 'body25':
         limbSeq = [[1,0],[1,2],[2,3],[3,4],[1,5],[5,6],[6,7],[1,8],[8,9],[9,10],\
@@ -124,24 +127,28 @@ def get_bodypose(candidate, subset, model_type='coco'):
             x, y = candidate[index][0:2] # 983.0, 172.0
             x_y_circles.append((x, y))
             # cv2.circle(canvas, (int(x), int(y)), 4, colors[i], thickness=-1)
+
+    x_y_sticks=[]
     for i in range(njoint-1):
         for n in range(len(subset)):
             index = subset[n][np.array(limbSeq[i])] #0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, -1.0, 11.0, 12.0, -1.0, 13.0, 14.0, 15.0, 16.0, -1.0, -1.0, -1.0, -1.0, -1.0
             if -1 in index:
                 continue
-            cur_canvas = canvas.copy()
+            # cur_canvas = canvas.copy()
             Y = candidate[index.astype(int), 0]
             X = candidate[index.astype(int), 1]
             mX = np.mean(X)
             mY = np.mean(Y)
             length = ((X[0] - X[1]) ** 2 + (Y[0] - Y[1]) ** 2) ** 0.5
             angle = math.degrees(math.atan2(X[0] - X[1], Y[0] - Y[1]))
-            polygon = cv2.ellipse2Poly((int(mY), int(mX)), (int(length / 2), stickwidth), int(angle), 0, 360, 1)
-            cv2.fillConvexPoly(cur_canvas, polygon, colors[i])
-            canvas = cv2.addWeighted(canvas, 0.4, cur_canvas, 0.6, 0)
+            x_y_sticks.append((mY, mX,angle,length))
+            # print('new  (mX,mY,length,angle)',(mX,mY,length,angle))
+            # polygon = cv2.ellipse2Poly((int(mY), int(mX)), (int(length / 2), stickwidth), int(angle), 0, 360, 1)
+            # cv2.fillConvexPoly(cur_canvas, polygon, colors[i])
+            # canvas = cv2.addWeighted(canvas, 0.4, cur_canvas, 0.6, 0)
     # plt.imsave("preview.jpg", canvas[:, :, [2, 1, 0]])
     # plt.imshow(canvas[:, :, [2, 1, 0]])
-    return x_y_circles
+    return (x_y_circles,x_y_sticks,)
 
 #all_hands_peaks[[[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1100, 858], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]], [[0, 0], [858, 859], [868, 894], [873, 938], [0, 0], [802, 920], [807, 961], [821, 977], [836, 992], [0, 0], [781, 955], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]]
 def draw_handpose(canvas, all_hand_peaks, show_number=False):
@@ -163,16 +170,53 @@ def draw_handpose(canvas, all_hand_peaks, show_number=False):
             if np.sum(np.all(peaks[e], axis=1)==0)==0:
                 x1, y1 = peaks[e[0]]
                 x2, y2 = peaks[e[1]]
+                # print(f'original ax.plot([{x1}, {x2}], [{y1}, {y2}], color=matplotlib.colors.hsv_to_rgb([ie/float({len(edges)}), 1.0, 1.0]))')
                 ax.plot([x1, x2], [y1, y2], color=matplotlib.colors.hsv_to_rgb([ie/float(len(edges)), 1.0, 1.0]))
 
         for i, keyponit in enumerate(peaks):
             x, y = keyponit
+            # print(f"original ax.plot({x}, {y}, 'r.')")
             ax.plot(x, y, 'r.')
             if show_number:
                 ax.text(x, y, str(i))
+    # print(f'width = {width}, height={height}')
     bg.draw()
     canvas = np.fromstring(bg.tostring_rgb(), dtype='uint8').reshape(int(height), int(width), 3)
     return canvas
+
+def get_handpose(all_hand_peaks, show_number=False):
+    edges = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [0, 9], [9, 10], \
+             [10, 11], [11, 12], [0, 13], [13, 14], [14, 15], [15, 16], [0, 17], [17, 18], [18, 19], [19, 20]]
+    # fig = Figure(figsize=plt.figaspect(canvas))
+
+    # fig.subplots_adjust(0, 0, 1, 1)
+    # fig.subplots_adjust(bottom=0, top=1, left=0, right=1)
+    # bg = FigureCanvas(fig)
+    # ax = fig.subplots()
+    # ax.axis('off')
+    # ax.imshow(canvas)
+
+    # width, height = ax.figure.get_size_inches() * ax.figure.get_dpi()
+    export_edges=[]
+    export_peaks=[]
+    for peaks in all_hand_peaks:
+        for ie, e in enumerate(edges):
+            if np.sum(np.all(peaks[e], axis=1)==0)==0:
+                x1, y1 = peaks[e[0]]
+                x2, y2 = peaks[e[1]]
+                export_edges.append((ie,(x1, y1),(x2, y2)))
+                # ax.plot([x1, x2], [y1, y2], color=matplotlib.colors.hsv_to_rgb([ie/float(len(edges)), 1.0, 1.0]))
+
+        for i, keyponit in enumerate(peaks):
+            x, y = keyponit
+            # ax.plot(x, y, 'r.')
+            # if show_number:
+            #     ax.text(x, y, str(i))
+
+            export_peaks.append((x,y,str(i)))
+    # bg.draw()
+    # canvas = np.fromstring(bg.tostring_rgb(), dtype='uint8').reshape(int(height), int(width), 3)
+    return (export_edges,export_peaks)
 
 # image drawed by opencv is not good.
 def draw_handpose_by_opencv(canvas, peaks, show_number=False):

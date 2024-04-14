@@ -12,7 +12,7 @@ import argparse
 from torchinfo import summary
 from src.body import Body
 from src.hand import Hand
-from src.model_keras import ISLSignPos
+from src.ISL_Model_parameter import ISLSignPos
 
 
 model_type = 'body25'  # 'coco'  #  
