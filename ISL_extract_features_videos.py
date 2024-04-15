@@ -111,7 +111,7 @@ class Writer():
                    pix_fmt="bgr24",
                    s='%sx%s'%(input_framesize[1],input_framesize[0]),
                    r=input_fps)
-            .output(output_file, pix_fmt=input_pix_fmt, vcodec=input_vcodec)
+            .output(output_file, pix_fmt=input_pix_fmt, vcodec=input_vcodec,videoScale="trunc(iw/2)*2:trunc(ih/2)*2")
             .overwrite_output()
             .run_async(pipe_stdin=True)
         )
