@@ -194,7 +194,7 @@ if __name__ == "__main__":
     # original_video_path=os.path.join(video_path,'original')
     # Path(original_video_path).mkdir(parents=True, exist_ok=True)
     # Specify the path and filename for the CSV file
-    csv_filename = os.path.join(feature_base_path+"/output.csv")
+    csv_filename = os.path.join(feature_base_path+f"/output-{args.expression}.csv")
     df=pd.DataFrame(features)
     df.to_csv(csv_filename, index=False)
 
