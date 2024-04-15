@@ -28,6 +28,7 @@ from torchvision.transforms import functional as F
 import os.path
 from torchvision.transforms import v2
 from torchvision.transforms.functional import to_pil_image
+import argparse
 
 
 df = pd.read_csv('C:/Users/spsar/source/repos/ISL-SignLanguage-Translation/datasets/Files-INCLUDE.csv')
@@ -60,7 +61,7 @@ test=True
 def saveFeature(filename,frame,idx,transform,feature,label_type,label_expression):
   transforms_path_local=os.path.join(transforms_path_parent+"/"+label_type+"/"+label_expression)
   (candidate, subset,all_hand_peaks)=feature
-  print(f"creating directory {os.path.join(transforms_path_local+f'/{filename}-{transform}')}")
+  
   Path(os.path.join(transforms_path_local+f'/{filename}-{transform}')).mkdir(parents=True, exist_ok=True)
   with open( os.path.join(transforms_path_local+f'/{filename}-{transform}'+f'/{filename}-{str(idx)}.json') , "w" ) as write:
     json.dump({
@@ -80,6 +81,17 @@ def saveFeature(filename,frame,idx,transform,feature,label_type,label_expression
     to_pil_image(frame).save(os.path.join(transforms_path_local+f'/{filename}-{transform}'+f'/{filename}-{str(idx)}.jpg'))
     # logger.info(f'DONE saving canvas file {filename} to local machine')
 
+  features={}
+  features['transform']=feature
+  features['filepath']=json_path
+  features['frame_no']=idx
+  features['type']=label_type
+  features['expression']=label_expression
+  features['candidate']=signpose
+  features['subset']=subset
+  features['all_hand_peaks']=all_hand_peaks
+
+  return features
 # Function to extract features from a single video
 def extract_features_worker(video_path,label_type,label_expression, model, device):
   filename=video_path.split('/')[-1]
@@ -90,19 +102,20 @@ def extract_features_worker(video_path,label_type,label_expression, model, devic
   # Load video using OpenCV or other library
   frames, audio, info = read_video(os.path.join(original_video_path), pts_unit='sec',output_format='TCHW')
 
-  features = {}
+  features = []
 
   # Extract features from each frame
   with torch.no_grad():
       for idx,frame in enumerate(frames):
-          feature = model(frame.permute(1, 2, 0).cpu().numpy())
-          features['original']=feature
-          saveFeature(filename,frame,idx,'original',feature,label_type,label_expression)
+          print(f"processing frame {idx} - {original_video_path} ")
+          signpose = model(frame.permute(1, 2, 0).cpu().numpy())          
+          feature=saveFeature(filename,frame,idx,'original',signpose,label_type,label_expression)
+          features.append(feature)
           for transformation in transformations:
             transformed_frame = transformation(frame)
-            transformed_feature = model(transformed_frame.permute(1, 2, 0).cpu().numpy())
-            features[transformation.__class__.__name__]=feature
-            saveFeature(filename,frame,idx,transformation.__class__.__name__,transformed_feature,label_type,label_expression)
+            transformed_signpose = model(transformed_frame.permute(1, 2, 0).cpu().numpy())
+            feature=saveFeature(filename,frame,idx,transformation.__class__.__name__,transformed_signpose,label_type,label_expression)
+            features.append(feature)
 
   os.remove(original_video_path)
   # Return the list of features
@@ -132,20 +145,22 @@ def extract_features_worker_wrapper(chunk, model, device):
     cumulative_features = []
     print('extract_features_worker_wrapper(chunks, model, device, queue)')
     for idx,row in chunk.iterrows():
-        signpose=extract_features_worker(row['Filepath'],row['type'],row['expression'], model.to(device), device)
-        features={}
-        features['filepath']=row['Filepath']
-        features['type']=row['type']
-        features['expression']=row['expression']
-        features['signpose']=signpose
-        cumulative_features.append(features)
+        features=extract_features_worker(row['Filepath'],row['type'],row['expression'], model.to(device), device)
+
+        cumulative_features.extend(features)
 
     # queue.put(cumulative_features)
     return cumulative_features
 
 if __name__ == "__main__":
     # multiprocessing.freeze_support()
-    print('loop')
+    parser = argparse.ArgumentParser(
+    description="Process a video annotating poses detected.")
+    parser.add_argument('expression', type=str, help='Video file location to process.')
+
+    args = parser.parse_args()
+    
+    print(f'processing files for {args.expression}')
     model_type = 'body25'  # 'coco'  #
     if model_type=='body25':
         model_path = './model/pose_iter_584000.caffemodel.pt'
@@ -154,7 +169,7 @@ if __name__ == "__main__":
     body_estimation_pytorch = Body(model_path, model_type)
     hand_estimation_pytorch = Hand('model/hand_pose_model.pth')
     # isl=ISLSignPos(body_estimation_pytorch.model,hand_estimation_pytorch.model)
-    isl=ISLSignPos(body_estimation_pytorch.model,hand_estimation_pytorch.model)
+    isl = ISLSignPos(body_estimation_pytorch.model,hand_estimation_pytorch.model)
     # Choose device (CPU or GPU)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -163,7 +178,7 @@ if __name__ == "__main__":
     print('extract_features(include_dataset, mylayer, device, num_workers)')
     # Extract features
     # mylayer=MyLayer(body_estimation_pytorch.model,hand_estimation_pytorch.model)
-    include_dataset=df[df['expression'].isin(['loud'])]
+    include_dataset = df[df['expression'].isin([args.expression])]
     features = extract_features(include_dataset, isl, device)
     video_paths = include_dataset['Filepath'].tolist()
 
@@ -180,8 +195,7 @@ if __name__ == "__main__":
     csv_filename = os.path.join(feature_base_path+"/output.csv")
     df=pd.DataFrame(features)
     df.to_csv(csv_filename, index=False)
-    shutil.copy(csv_filename, '/content/drive/MyDrive/CapstoneProject-ISL-SignLanguageTranslation/features')
 
     consolidated_features_json=json.dumps(features, cls=NumpyArrayEncoder)
-    with open( os.path.join(feature_base_path+f'include_dataset_features.json') , "w" ) as write:
+    with open( os.path.join(feature_base_path+f'/include_dataset_features.json') , "w" ) as write:
       write.write(consolidated_features_json)
