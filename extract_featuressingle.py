@@ -83,13 +83,15 @@ def saveFeature(filename,frame,idx,transform,feature,label_type,label_expression
 
   features={}
   features['transform']=feature
-  features['filepath']=json_path
+  features['filepath']=os.path.join(transforms_path_local+f'/{filename}-{transform}'+f'/{filename}-{str(idx)}.json')
   features['frame_no']=idx
   features['type']=label_type
   features['expression']=label_expression
-  features['candidate']=signpose
+  features['candidate']=candidate
   features['subset']=subset
   features['all_hand_peaks']=all_hand_peaks
+
+  print(json.dumps(features, cls=NumpyArrayEncoder))
 
   return features
 # Function to extract features from a single video
@@ -117,7 +119,7 @@ def extract_features_worker(video_path,label_type,label_expression, model, devic
             feature=saveFeature(filename,frame,idx,transformation.__class__.__name__,transformed_signpose,label_type,label_expression)
             features.append(feature)
 
-  os.remove(original_video_path)
+  os.remove(json.dumps(features, cls=NumpyArrayEncoder))
   # Return the list of features
   return features
 
