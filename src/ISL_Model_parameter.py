@@ -20,33 +20,19 @@ class ISLSignPos(keras.Model):
         self.npaf_body = 52
 
     def call(self, oriImg):
-        print(type(oriImg))
-
-        
-        oriImgLocal=oriImg.cpu()
-        print(type(oriImgLocal))
-
-        if oriImg.shape[0]<4:
-            # print("resizing image from CHW to HWC")
-            oriImgLocal=oriImgLocal.permute(1, 2, 0)
-        candidate, subset = self.bodypos(oriImgLocal.numpy())
-        # handpos = self.pt_hand(inputs)
-        hands_list = util.handDetect(candidate, subset, oriImgLocal.numpy())
+        candidate, subset = self.bodypos(oriImg.cpu().numpy())
+        hands_list = util.handDetect(candidate, subset, oriImg.cpu().numpy())
         all_hand_peaks = []
         for x, y, w, is_left in hands_list:
-            if oriImgLocal.shape[0]<4:
-                # print("resizing image from CHW to HWC")
-                oriImgLocal=oriImgLocal.permute(1, 2, 0)
-            peaks = self.handpos(oriImgLocal.numpy()[y:y+w, x:x+w, :])
+            if oriImg.shape[0]<4:
+                oriImg=oriImg.permute(1, 2, 0)
+            peaks = self.handpos(oriImg.cpu().numpy()[y:y+w, x:x+w, :])
             peaks[:, 0] = np.where(peaks[:, 0]==0, peaks[:, 0], peaks[:, 0]+x)
             peaks[:, 1] = np.where(peaks[:, 1]==0, peaks[:, 1], peaks[:, 1]+y)
             all_hand_peaks.append(peaks)
-        # canvas = util.draw_handpose(canvas, all_hand_peaks)
         return (candidate, subset,all_hand_peaks)
     
     def bodypos(self, oriImg):
-        # scale_search = [0.5, 1.0, 1.5, 2.0]
-        # print("type(oriImg)",type(oriImg))
         model_type = 'body25'
         scale_search = [0.5]
         boxsize = 368
@@ -68,20 +54,16 @@ class ISLSignPos(keras.Model):
             data = torch.from_numpy(im).float()
             if torch.cuda.is_available():
                 data = data.cuda()
-            # data = data.permute([2, 0, 1]).unsqueeze(0).float()
             with torch.no_grad():
                 Mconv7_stage6_L1, Mconv7_stage6_L2 = self.pt_body(data)
             Mconv7_stage6_L1 = Mconv7_stage6_L1.cpu().numpy()
             Mconv7_stage6_L2 = Mconv7_stage6_L2.cpu().numpy()
 
-            # extract outputs, resize, and remove padding
-            # heatmap = np.transpose(np.squeeze(net.blobs[output_blobs.keys()[1]].data), (1, 2, 0))  # output 1 is heatmaps
             heatmap = np.transpose(np.squeeze(Mconv7_stage6_L2), (1, 2, 0))  # output 1 is heatmaps
             heatmap = cv2.resize(heatmap, (0, 0), fx=stride, fy=stride, interpolation=cv2.INTER_CUBIC)
             heatmap = heatmap[:imageToTest_padded.shape[0] - pad[2], :imageToTest_padded.shape[1] - pad[3], :]
             heatmap = cv2.resize(heatmap, (oriImg.shape[1], oriImg.shape[0]), interpolation=cv2.INTER_CUBIC)
 
-            # paf = np.transpose(np.squeeze(net.blobs[output_blobs.keys()[0]].data), (1, 2, 0))  # output 0 is PAFs
             paf = np.transpose(np.squeeze(Mconv7_stage6_L1), (1, 2, 0))  # output 0 is PAFs
             paf = cv2.resize(paf, (0, 0), fx=stride, fy=stride, interpolation=cv2.INTER_CUBIC)
             paf = paf[:imageToTest_padded.shape[0] - pad[2], :imageToTest_padded.shape[1] - pad[3], :]
