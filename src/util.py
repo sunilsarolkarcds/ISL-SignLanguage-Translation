@@ -246,7 +246,7 @@ def handDetect(candidate, subset, oriImg):
     detect_result = []
     
     image_height, image_width = oriImg.shape[0:2]
-    print(f'handDetect ---------- {image_height}, {image_width}')
+    #print(f'handDetect ---------- {image_height}, {image_width}')
     for person in subset.astype(int):
         # if any of three not detected
         has_left = np.sum(person[[5, 6, 7]] == -1) == 0

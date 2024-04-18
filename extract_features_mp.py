@@ -64,7 +64,7 @@ def saveFeaturesDict(features,process_id,filename):
   timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
   csv_filename = os.path.join(feature_base_path, f"{filename}_{timestamp}.csv")
   # print('features',features)
-  df_folder = pd.DataFrame.from_dict(features) 
+  df_folder = pd.DataFrame(features)
   df_folder.to_csv(csv_filename, index=False)
 
 def saveFeature(filename, frame, idx, transform, feature, label_type, label_expression,device):
@@ -232,6 +232,6 @@ if __name__ == "__main__":
   execution_time = end_time - start_time
   timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
   csv_filename = os.path.join(feature_base_path, f"output_{timestamp}_exectime-{execution_time:.4f}.csv")
-  print('features',features_dict)
-  df_folder = pd.DataFrame.from_dict(features_dict) 
+  # print('features',features_dict)
+  df_folder = pd.DataFrame(features_dict)
   df_folder.to_csv(csv_filename, index=False)
