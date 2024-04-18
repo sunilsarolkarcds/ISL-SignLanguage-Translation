@@ -24,8 +24,6 @@ class ISLSignPos(keras.Model):
         hands_list = util.handDetect(candidate, subset, oriImg.cpu().numpy())
         all_hand_peaks = []
         for x, y, w, is_left in hands_list:
-            if oriImg.shape[0]<4:
-                oriImg=oriImg.permute(1, 2, 0)
             peaks = self.handpos(oriImg.cpu().numpy()[y:y+w, x:x+w, :])
             peaks[:, 0] = np.where(peaks[:, 0]==0, peaks[:, 0], peaks[:, 0]+x)
             peaks[:, 1] = np.where(peaks[:, 1]==0, peaks[:, 1], peaks[:, 1]+y)

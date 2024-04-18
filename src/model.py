@@ -295,6 +295,8 @@ class bodypose_model(nn.Module):
         self.model4_2 = blocks['block4_2']
         self.model5_2 = blocks['block5_2']
         self.model6_2 = blocks['block6_2']
+        for param in self.parameters():
+            param.requires_grad = False
 
 
     def forward(self, x):
