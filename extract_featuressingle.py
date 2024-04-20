@@ -82,7 +82,7 @@ def saveFeature(filename,frame,idx,transform,feature,label_type,label_expression
     # logger.info(f'DONE saving canvas file {filename} to local machine')
 
   features={}
-  features['transform']=feature
+  features['transform']=transform
   features['filepath']=os.path.join(transforms_path_local+f'/{filename}-{transform}'+f'/{filename}-{str(idx)}.json')
   features['frame_no']=idx
   features['type']=label_type

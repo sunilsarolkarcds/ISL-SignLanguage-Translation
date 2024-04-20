@@ -1,4 +1,4 @@
-import cv2
+
 import copy
 import numpy as np
 
@@ -33,6 +33,7 @@ from torchvision.transforms import v2
 from torchvision.transforms.functional import to_pil_image
 import multiprocessing
 import datetime
+import cv2
 from src.util import get_bodypose
 from src.util import get_handpose
 from src.util import drawStickmodel
@@ -89,6 +90,7 @@ def saveFeature(filename, frame, idx, transform, feature, label_type, label_expr
         frame=drawStickmodel(frame,bodypose_x_ytupple,bodypose_x_y_sticks,handpose_edges,handpose_peaks)
         to_pil_image(frame).save(os.path.join(directory_path, f"{filename.split('.')[0]}-{str(idx)}.jpg"))
 
+    
 
     features={}
     features['transform']=transform
@@ -223,7 +225,7 @@ if __name__ == "__main__":
   features_dict = []
   while not queue.empty():
     try:
-      video_path, features = queue.get()
+      features = queue.get()
       features_dict.extend(features)
     except Exception as e:
       print(f"Error collecting result: {e}")

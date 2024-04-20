@@ -363,6 +363,31 @@ def drawStickmodel(oriImg,x_ytupple,x_y_sticks,export_edges,export_peaks):
     # cv2.imwrite('C:/Users/spsar/Downloads/MVI_5177.MOV-transformed/MVI_5177.MOV-GaussianBlur/MVI_5177.MOV-14-modified.jpg', canvas) 
     return canvas
 
+def crop_to_drawing(image):
+  """
+  Crops an image to the tight bounding rectangle of non-zero pixels.
+
+  Args:
+      image: A NumPy array representing the image.
+
+  Returns:
+      A cropped image (NumPy array) containing only the drawing area.
+  """
+  image=np.transpose(image, (2, 0, 1))
+  united_x,united_h=0,0
+  for channel in np.arange(image.shape[0]):
+    x, y, w, h = cv2.boundingRect(image[channel])
+    if x>united_x:
+        united_x=x
+
+    if h>united_h:
+        united_h=h
+
+  for channel in np.arange(image.shape[0]):
+    # Crop the image
+    image[channel] = image[channel][y:y+united_h, x:x+united_x]
+  return image.transpose(image, (1,2,0))
+
 # get max index of 2d array
 def npmax(array):
     arrayindex = array.argmax(1)

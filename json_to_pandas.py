@@ -33,6 +33,8 @@ from torchvision.transforms import v2
 from torchvision.transforms.functional import to_pil_image
 import multiprocessing
 import src.util as util
+import cv2
+from src.util import drawStickmodel
 
 df = pd.read_csv('C:/Users/spsar/source/repos/ISL-SignLanguage-Translation/datasets/Files-INCLUDE.csv')
 
@@ -62,8 +64,24 @@ def collect_file_paths(root_directory):
                                         candidate=np.array(data['candidate'])
                                         subset=np.array(data['subset'])
                                         hand_peaks=[np.array(a) for a in data['all_hand_peaks']]
+                                        canvas = np.zeros((1080, 1920, 3), dtype=np.uint8)
+                                        
                                         (bodypose_circles,bodypose_sticks,)=util.get_bodypose(candidate,subset,model_type)
                                         (handpose_edges,handpose_peaks)=util.get_handpose(hand_peaks)
+                                        canvas=drawStickmodel(canvas,bodypose_circles,bodypose_sticks,handpose_edges,handpose_peaks)
+                                        cv2.imwrite(f'{json_path}.stick.jpg', canvas) 
+                                        print(f'created {json_path}.stick.jpg')
+                                        # canvas=util.crop_to_drawing(canvas)
+                                        # cv2.imwrite(f'{json_path}.stick.cropped.jpg', canvas) 
+                                        coordinates = []
+                                        canvasT=canvas.transpose(2,0,1)
+                                        for c in range(canvasT.shape[0]):
+                                            for y in range(canvasT.shape[1]):
+                                                for x in range(canvasT.shape[2]):
+                                                    if cv2.countNonZero(canvas[c,y:y+1, x:x+1]) > 0:
+                                                        coordinates.append(c)
+                                                        coordinates.append(y)
+                                                        coordinates.append(x)
                                         
                                         data_list.append({
                                             'Type': type_folder,
@@ -76,7 +94,9 @@ def collect_file_paths(root_directory):
                                             'bodypose_circles':bodypose_circles,
                                             'bodypose_sticks':bodypose_sticks,
                                             'handpose_edges':handpose_edges,
-                                            'handpose_peaks':handpose_peaks
+                                            'handpose_peaks':handpose_peaks,
+                                            'canvas_shape':canvas.shape,
+                                            'coordinates':coordinates
                                     })
                                 
     return data_list

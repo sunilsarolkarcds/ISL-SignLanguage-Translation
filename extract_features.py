@@ -1,206 +1,196 @@
-import cv2
-import copy
-import numpy as np
-
-from src.body import Body
-from src.hand import Hand
-import os
 import pandas as pd
+from PIL import Image
 import torch
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
 from torchvision.io import read_video
-from torchvision.transforms import functional as F
 import os.path
 from torchvision.transforms import v2
-# from src.sign_pose import sign_pose
 from src.ISL_Model_parameter import ISLSignPos
 from src.body import Body
 from src.hand import Hand
+from datetime import datetime
 import json
-from torch.utils.data import random_split
-from torch.multiprocessing import spawn
-import torch.multiprocessing as mp
-import json
-from json import JSONEncoder
-import numpy as np
-import pandas as pd
-from pathlib import Path
-import shutil
+from datetime import datetime
+import pims
 import time
-import torch
-from torchvision.transforms import functional as F
-import os.path
-from torchvision.transforms import v2
+import zipfile
+import shutil
+import copy
+import src.util as util
+import torch.distributed
+import numpy as np
+import torch.multiprocessing as mp
 from torchvision.transforms.functional import to_pil_image
-import multiprocessing
+include_dataset_csv='C:/Users/spsar/capstone/sample.csv'
+dataset_base_path='C:/Users/spsar/capstone/samples/'
+feature_base_path='C:/Users/spsar/capstone/samples/features'
 
-df = pd.read_csv('C:/Users/spsar/source/repos/ISL-SignLanguage-Translation/datasets/Files-INCLUDE.csv')
-include_dataset=df[df['expression'].isin(['loud','quite','happy'])]
-feature_base_path='C:/Users/spsar/capstone/ISL-sign-language-recognition/features'
-dataset_base_path='C:/Users/spsar/capstone/ISL-sign-language-recognition'
+model_type = 'body25'  # 'coco'  #
+if model_type=='body25':
+    model_path = './model/pose_iter_584000.caffemodel.pt'
+else:
+    model_path = './model/body_pose_model.pth'
+body_estimation_pytorch = Body(model_path, model_type)
+hand_estimation_pytorch = Hand('model/hand_pose_model.pth')
+model=ISLSignPos(body_estimation_pytorch.model,hand_estimation_pytorch.model)
 
-manager = mp.Manager()
-processing_status = manager.list()
+class IncludeDatasetFeatureExtractorDataset(Dataset):
+    def __init__(self, dataset, transforms=None):
+        self.device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.dataset = dataset
+        # self.transforms=transforms
+        self.transforms = [transform.to(self.device) for transform in transforms]
+        
+        self.dataset_base_path=dataset_base_path
+        self.feature_base_path=feature_base_path
+        self.transforms_path_parent = os.path.join(self.feature_base_path, 'transforms')
+        self.test=True
 
-class NumpyArrayEncoder(JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return JSONEncoder.default(self, obj)
+    def isl(self,origImage):
+       with torch.no_grad():
+        return model(origImage)
+    
+
+    def __len__(self):
+        return self.dataset.shape[0]
+
+    def __getitem__(self, idx):
+        video_path = os.path.join(self.dataset_base_path,self.dataset.iloc[idx, 0])
+        label_type = self.dataset.iloc[idx, 1]
+        label_expression = self.dataset.iloc[idx, 2]
+        print('[STARTED]',video_path,label_type,label_expression)
+        features=self.extract_features_worker(video_path,label_type,label_expression)
+        return features
+
+    def zip_and_move(self,zipfilename, sourcefolderpath, destinationpath):
+      with zipfile.ZipFile(zipfilename, 'w') as zipf:
+          # Walk through all the files in the specified folder
+          for root, dirs, files in os.walk(sourcefolderpath):
+              for file in files:
+                  # Create the full path to the file
+                  file_path = os.path.join(root, file)
+
+                  # Add the file to the zip archive
+                  # The first argument is the file path, and the second argument is the name inside the zip file
+                  # We use os.path.relpath to make sure the file paths inside the zip archive are relative to the root
+                  zipf.write(file_path, os.path.relpath(file_path, sourcefolderpath))
+
+          print(f'moving file {zipfilename} to {destinationpath}')
+          shutil.move(zipfilename, destinationpath)
+
+    def ensure(self,directory_path):
+      if not os.path.exists(directory_path):
+        os.makedirs(directory_path)
+      return directory_path
+
+    def saveFeaturesDict(self,features,process_id,filename):
+      if len(features)==0:
+         return
+      print(f'saving outputs for process#{process_id} {filename}')
+      timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+      csv_filename = os.path.join(self.feature_base_path, f"{filename}_{timestamp}.csv")
+      # print('features',features)
+      df_folder = pd.DataFrame(features)
+      df_folder.to_csv(csv_filename, index=False)
+
+    def is_processed(self,filename,idx,transform, label_type, label_expression):
+        transforms_path_local = os.path.join(self.transforms_path_parent, label_type, label_expression)
+        directory_path = os.path.join(transforms_path_local, f"{filename.split('.')[0]}-{transform}")
+
+        return (os.path.exists(os.path.join(directory_path, f'{filename}-{str(idx)}.json'))) and (os.path.exists(os.path.join(directory_path, f"{filename.split('.')[0]}-{str(idx)}.jpg")))
+
+        
+
+    def saveFeature(self,filename, frame, idx, transform, feature, label_type, label_expression):
+        transforms_path_local = os.path.join(self.transforms_path_parent, label_type, label_expression)
+        directory_path = os.path.join(transforms_path_local, f"{filename.split('.')[0]}-{transform}")
+        self.ensure(directory_path)
+        model_type = 'body25'
+        (bodypose_x_ytupple,bodypose_x_y_sticks)=util.get_bodypose(feature[0],feature[1],model_type)
+        (handpose_edges,handpose_peaks)=util.get_handpose(feature[2])
+        # Path(os.path.join(transforms_path_local, f'{filename.split('.')[0]}-{transform}')).mkdir(parents=True, exist_ok=True)
+        with open(os.path.join(directory_path, f'{filename}-{str(idx)}.json'), "w") as write:
+            json.dump({
+                'candidate': feature[0].tolist(),
+                'subset': feature[1].tolist(),
+                'all_hand_peaks': [peak.tolist() for peak in feature[2]]
+            }, write)
+        if self.test:
+            # directory_path = os.path.join(transforms_path_local, f"{filename.split('.')[0]}-{transform}")
+            # if not os.path.exists(directory_path):
+            #   os.makedirs(directory_path)
+            # to_pil_image(frame).save(os.path.join(directory_path, f"{filename.split('.')[0]}-{str(idx)}.jpg"))
+            frame=util.drawStickmodel(frame,bodypose_x_ytupple,bodypose_x_y_sticks,handpose_edges,handpose_peaks)
+            to_pil_image(frame).save(os.path.join(directory_path, f"{filename.split('.')[0]}-{str(idx)}.jpg"))
 
 
-class MyLayer(torch.nn.Module):
-    def __init__(self, a, b):
-        super(MyLayer, self).__init__()
+        features={}
+        features['transform']=transform
+        features['filepath']=os.path.join(directory_path, f'{filename}-{str(idx)}.json')
+        features['frame_no']=idx
+        features['type']=label_type
+        features['expression']=label_expression
+        features['candidate']= feature[0].tolist()
+        features['subset']=feature[1].tolist()
+        features['all_hand_peaks']=[peak.tolist() for peak in feature[2]]
+        features['bodypose_x_ytupple']=bodypose_x_ytupple
+        features['bodypose_x_y_sticks']=bodypose_x_y_sticks
+        features['handpose_edges']=handpose_edges
+        features['handpose_peaks']=handpose_peaks
+        return features
 
-    def my_function(self, x):
-        return (np.array([]),np.array([]),np.array([]))
+    def extract_features_worker(self,video_path, label_type, label_expression):
+        # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        process_id=os.getpid()
+        print(f'process#{process_id} processing {video_path}')
+        filename = video_path.split('/')[-1]
+        original_video_path = os.path.join(self.dataset_base_path, video_path)
+        # frames, audio, info = read_video(os.path.join(original_video_path), pts_unit='sec', output_format='TCHW')
+        features = []
+        video = pims.Video(original_video_path)
+        totalFrames=len(video)
+        start_time = time.time()
+        for idx,frame in enumerate(video):
+          if idx>5:
+             break
+          if self.is_processed(filename,idx,'original', label_type, label_expression):
+             print(f'[ALREADY PROCESSED] process#{process_id} ALREADY PROCESSED frame#{idx}/{totalFrames} of {original_video_path}')
+             continue
+          canvas=copy.deepcopy(frame)
+          # oriImg = cv2.imread('C:/Users/spsar/OneDrive/Desktop/MVI_2978-0.jpg')
+          print(f'process#{process_id} processing frame#{idx}/{totalFrames} of {original_video_path}')
+          model_feature = self.isl(frame[:, :, ::-1])  # Move frame to device
+          #print(f'features  frame#{idx}/{totalFrames} of {original_video_path} --- {model_feature}')
+          feature_entry=self.saveFeature(filename, canvas, idx, 'original', model_feature, label_type, label_expression)
+          features.append(feature_entry)
 
-    def forward(self, x):
-        return self.my_function(x)
+        end_time = time.time()
+        execution_time = end_time - start_time
+        self.saveFeaturesDict(features,process_id,f'output_{process_id}_{filename}_exectime-{execution_time:.4f}')
+
+        # os.remove(original_video_path)
+        return features
 
 transformations = [
-    v2.RandomRotation(degrees=30),
-    v2.RandomSolarize(threshold=192.0),
+    # v2.RandomRotation(degrees=30),
+    # v2.RandomSolarize(threshold=192.0),
+    # normalise
 ]
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# self.transforms=transforms
-transforms = [transform.to(device) for transform in transformations]
+
+# transform = va.VideoAugment(seq)  # Video augmentation pipeline
+# mp.set_start_method('spawn')
+# Create dataset and dataloader
 
 
-transforms_path_parent=os.path.join(feature_base_path,'transforms')
-test=True
-
-def saveFeature(filename,frame,idx,transform,feature,label_type,label_expression):
-  transforms_path_local=os.path.join(transforms_path_parent,label_type,label_expression)
-  (candidate, subset,all_hand_peaks)=feature
-  Path(os.path.join(transforms_path_local,f'{filename}-{transform}')).mkdir(parents=True, exist_ok=True)
-  with open( os.path.join(transforms_path_local,f'{filename}-{transform}',f'{filename}-{str(idx)}.json') , "w" ) as write:
-    json.dump({
-        'candidate':candidate.tolist(),
-        'subset':subset.tolist(),
-        'all_hand_peaks':[peak.tolist() for peak in all_hand_peaks]
-
-    } , write )
-  if test:
-    # print("frame.shape",frame.shape)
-    canvas = copy.deepcopy(frame.permute(1, 2, 0).cpu().numpy())
-    # print("canvas.shape",canvas.shape)
-    # canvas = util.draw_bodypose(canvas, candidate, subset, model_type)
-    # canvas = util.draw_handpose(canvas, all_hand_peaks)
-    # logger.info(f'saving canvas file {filename} to local machine')
-    #Path(os.path.join(transforms_path_local,f'{filename}-{transform}')).mkdir(parents=True, exist_ok=True)
-    to_pil_image(frame).save(os.path.join(transforms_path_local,f'{filename}',f'{filename}-{str(idx)}.jpg'))
-    # logger.info(f'DONE saving canvas file {filename} to local machine')
-
-# Function to extract features from a single video
-def extract_features_worker(video_path,label_type,label_expression, model, device):
-  filename=video_path.split('/')[-1]
-  original_video_path=os.path.join(dataset_base_path,video_path)
-  # Path(original_video_path).mkdir(parents=True, exist_ok=True)
-  # shutil.copy(video_path, original_video_path)
-
-  # Load video using OpenCV or other library
-#   frames, _ = cv2.VideoCapture(original_video_path).read()
-
-  frames, audio, info = read_video(os.path.join(original_video_path,filename), pts_unit='sec',output_format='TCHW')
-
-  features = {}
-
-  # Extract features from each frame
-  with torch.no_grad():
-      for idx,frame in enumerate(frames):
-          feature = model(frame)
-          features['original']=feature.cpu()
-          saveFeature(filename,frame,idx,'original',feature,label_type,label_expression)
-          for transformation in transformations:
-            transformed_frame = transformation.ToTensor()(frame)
-            transformed_feature = model(transformed_frame)
-            features[transformation.__class__.__name__]=feature.cpu()
-            saveFeature(filename,frame,idx,transformation.__class__.__name__,transformed_feature)
-
-  os.remove(original_video_path)
-  # Return the list of features
-  return features
-
-
-# Function to spawn worker processes for feature extraction
-def extract_features(video_dataset, model, device, num_workers):
-    # Split dataset into chunks for parallel processing
-    # chunks = [video_dataset for _ in range(num_workers)]
-    chunks = [df.iloc[i:i + num_workers] for i in range(0, len(df), num_workers)]
-    # Spawn worker processes
-    queue = mp.Queue()
-    results = []
-    print('spawn(')
-    spawn(
-        extract_features_worker_wrapper,
-        args=(chunks, model, device,queue),
-        nprocs=num_workers
-    )
-
-    for _ in range(num_workers):
-        result = queue.get()  # Get the result from the queue
-        results.append(result)
-
-    return results
-
-# Wrapper function for spawn to handle multiple chunks per worker
-def extract_features_worker_wrapper(chunks, model, device, queue):
-    cumulative_features = []
-    print('extract_features_worker_wrapper(chunks, model, device, queue)')
-    for chunk in chunks:
-        for idx,row in chunk.iterrows():
-            processing_status.append(f"Processing: {row['Filepath']}")
-            signpose=extract_features_worker(row['Filepath'],row['type'],row['expression'], model.to(device), device)
-            features={}
-            features['filepath']=row['Filepath']
-            features['type']=row['type']
-            features['expression']=row['expression']
-            features['signpose']=signpose
-            cumulative_features.append(features)
-            processing_status.append(f"Finished: {row['Filepath']}")
-
-    queue.put(cumulative_features)
-    return cumulative_features
-
+# model = torch.nn.parallel.DistributedDataParallel(model)
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
-    print('loop')
-    model_type = 'body25'  # 'coco'  #
-    if model_type=='body25':
-        model_path = './model/pose_iter_584000.caffemodel.pt'
-    else:
-        model_path = './model/body_pose_model.pth'
-    body_estimation_pytorch = Body(model_path, model_type)
-    hand_estimation_pytorch = Hand('model/hand_pose_model.pth')
-    # isl=ISLSignPos(body_estimation_pytorch.model,hand_estimation_pytorch.model)
-    isl=ISLSignPos(body_estimation_pytorch.model,hand_estimation_pytorch.model)
-    # Choose device (CPU or GPU)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    mp.set_start_method('spawn',force=True)
+    include_dataset=pd.read_csv(include_dataset_csv)
+    dataset = IncludeDatasetFeatureExtractorDataset(include_dataset, transforms=transformations)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=3)  # Batch size of 1 for individual video processing
 
-    # Number of worker processes
-    num_workers = 6
-    print('extract_features(include_dataset, mylayer, device, num_workers)')
-    # Extract features
-    # mylayer=MyLayer(body_estimation_pytorch.model,hand_estimation_pytorch.model)
-    features = extract_features(include_dataset, isl, device, num_workers)
-    video_paths = include_dataset['Filepath'].tolist()
-
-    while any(status == "Processing: " + video_path for video_path, status in zip(video_paths, processing_status)):
-      # Print processing status with progress information (optional)
-      print(f"Processing videos: {[status for status in processing_status if status.startswith('Processing: ')]}")
-      time.sleep(5)  # Adjust sleep time for status update frequency
-
-
-
-    # original_video_path=os.path.join(video_path,'original')
-    # Path(original_video_path).mkdir(parents=True, exist_ok=True)
-    # Specify the path and filename for the CSV file
-    csv_filename = os.path.join(feature_base_path,"output.csv")
-    df=pd.DataFrame(features)
-    df.to_csv(csv_filename, index=False)
-    shutil.copy(csv_filename, '/content/drive/MyDrive/CapstoneProject-ISL-SignLanguageTranslation/features')
-
-    consolidated_features_json=json.dumps(features, cls=NumpyArrayEncoder)
-    with open( os.path.join(feature_base_path,f'include_dataset_features.json') , "w" ) as write:
-      write.write(consolidated_features_json)
+    for i, data in enumerate(dataloader):
+        filename = f'augmented_video_{i}.json'
+        # save_json(data[0], filename)
+        print(f"Saved augmented frames for video {data} to {filename}")
