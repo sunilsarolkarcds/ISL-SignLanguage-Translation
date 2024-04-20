@@ -197,14 +197,14 @@ def get_handpose(all_hand_peaks, show_number=False):
     # ax.imshow(canvas)
 
     # width, height = ax.figure.get_size_inches() * ax.figure.get_dpi()
-    export_edges=[]
-    export_peaks=[]
-    for peaks in all_hand_peaks:
+    export_edges=[[],[]]
+    export_peaks=[[],[]]
+    for idx,peaks in enumerate(all_hand_peaks):
         for ie, e in enumerate(edges):
             if np.sum(np.all(peaks[e], axis=1)==0)==0:
                 x1, y1 = peaks[e[0]]
                 x2, y2 = peaks[e[1]]
-                export_edges.append((ie,(x1, y1),(x2, y2)))
+                export_edges[idx].append((ie,(x1, y1),(x2, y2)))
                 # ax.plot([x1, x2], [y1, y2], color=matplotlib.colors.hsv_to_rgb([ie/float(len(edges)), 1.0, 1.0]))
 
         for i, keyponit in enumerate(peaks):
@@ -213,7 +213,7 @@ def get_handpose(all_hand_peaks, show_number=False):
             # if show_number:
             #     ax.text(x, y, str(i))
 
-            export_peaks.append((x,y,str(i)))
+            export_peaks[idx].append((x,y,str(i)))
     # bg.draw()
     # canvas = np.fromstring(bg.tostring_rgb(), dtype='uint8').reshape(int(height), int(width), 3)
     return (export_edges,export_peaks)

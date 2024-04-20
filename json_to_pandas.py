@@ -68,25 +68,16 @@ def collect_file_paths(root_directory):
                                         
                                         (bodypose_circles,bodypose_sticks,)=util.get_bodypose(candidate,subset,model_type)
                                         (handpose_edges,handpose_peaks)=util.get_handpose(hand_peaks)
-                                        canvas=drawStickmodel(canvas,bodypose_circles,bodypose_sticks,handpose_edges,handpose_peaks)
-                                        cv2.imwrite(f'{json_path}.stick.jpg', canvas) 
-                                        print(f'created {json_path}.stick.jpg')
+                                        # canvas=drawStickmodel(canvas,bodypose_circles,bodypose_sticks,handpose_edges,handpose_peaks)
+                                        # cv2.imwrite(f'{json_path}.stick.jpg', canvas) 
+                                        # print(f'created {json_path}.stick.jpg')
                                         # canvas=util.crop_to_drawing(canvas)
                                         # cv2.imwrite(f'{json_path}.stick.cropped.jpg', canvas) 
-                                        coordinates = []
-                                        canvasT=canvas.transpose(2,0,1)
-                                        for c in range(canvasT.shape[0]):
-                                            for y in range(canvasT.shape[1]):
-                                                for x in range(canvasT.shape[2]):
-                                                    if cv2.countNonZero(canvas[c,y:y+1, x:x+1]) > 0:
-                                                        coordinates.append(c)
-                                                        coordinates.append(y)
-                                                        coordinates.append(x)
-                                        
-                                        data_list.append({
+                                        print(f'processed file {json_path}')
+                                        feature={
                                             'Type': type_folder,
                                             'Expression': expression_folder,
-                                            'FileName': file_name,
+                                            'FileName': file_name.split('-')[0],
                                             'Frame': int(file_name.split('-')[-1].split('.')[0]),  # Extract frame number from file name
                                             'Candidate': np.array(data['candidate']),
                                             'Subset': np.array(data['subset']),
@@ -94,10 +85,33 @@ def collect_file_paths(root_directory):
                                             'bodypose_circles':bodypose_circles,
                                             'bodypose_sticks':bodypose_sticks,
                                             'handpose_edges':handpose_edges,
-                                            'handpose_peaks':handpose_peaks,
-                                            'canvas_shape':canvas.shape,
-                                            'coordinates':coordinates
-                                    })
+                                            'handpose_peaks':handpose_peaks
+                                            }
+                                        
+                                        for idx,(body_x,body_y) in enumerate(bodypose_circles):
+                                            feature[f'bodypeaks_x_{idx}']=body_x
+                                            feature[f'bodypeaks_y_{idx}']=body_y
+
+                                        for idx,(meanx,meany,angle,length) in enumerate(bodypose_sticks):
+                                            feature[f'bodyedges_meanx_{idx}']=meanx
+                                            feature[f'bodyedges_meany_{idx}']=meany
+                                            feature[f'bodyedges_angle_{idx}']=angle
+                                            feature[f'bodyedges_length_{idx}']=length
+
+                                        for idx,hand_peaks in enumerate(handpose_peaks):
+                                            for (hand_x, hand_y, peaktxt) in hand_peaks:
+                                                feature[f'hand{idx}peaks_x_{peaktxt}']=hand_x
+                                                feature[f'hand{idx}peaks_y_{peaktxt}']=hand_y
+                                                feature[f'hand{idx}peaks_peaktxt{peaktxt}']=peaktxt
+
+                                        for idx,handedges in enumerate(handpose_edges):
+                                            for (peaktxt, (handedge_x1, handedge_y1), (handedge_x2, handedge_y2)) in handedges:
+                                                feature[f'hand{idx}edge_x1_{peaktxt}']=handedge_x1
+                                                feature[f'hand{idx}edge_y1_{peaktxt}']=handedge_y1
+                                                feature[f'hand{idx}edge_x2_{peaktxt}']=handedge_x2
+                                                feature[f'hand{idx}edge_y2_{peaktxt}']=handedge_y2
+
+                                        data_list.append(feature)
                                 
     return data_list
 
