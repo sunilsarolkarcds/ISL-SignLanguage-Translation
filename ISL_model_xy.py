@@ -24,7 +24,7 @@ from torchvision.transforms.functional import to_pil_image
 
 filepath='C:/Users/spsar/capstone/samples/features/transforms/Animals/Dog/MVI_2978-original/MVI_2978-0.jpg'
 
-videopath='C:/Users/spsar/capstone/samples/4010759/Animals/1. Dog/MVI_2978.MOV'
+videopath='D:/4010759/Home/24. Table/MVI_9002.MP4'
 cap = cv2.VideoCapture(videopath)
 
 videoframe0=None
@@ -37,27 +37,27 @@ cap.release()
 to_pil_image(videoframe0).save('C:/Users/spsar/OneDrive/Desktop/videoframe0.jpg')
 print(f'videoframe0 {type(videoframe0)} {frame.shape}')
 
-filename=filepath.split('/')[-1]
-directory_path=os.path.dirname(filepath)
-cv2Img = cv2.imread(filepath, cv2.IMREAD_UNCHANGED)
-print(f'oriImg {type(cv2Img)} {cv2Img.shape}')
+filename=videopath.split('/')[-1]
+directory_path=os.path.dirname(videopath)
+# cv2Img = cv2.imread(filepath, cv2.IMREAD_UNCHANGED)
+# print(f'oriImg {type(cv2Img)} {cv2Img.shape}')
 
-to_pil_image(cv2Img).save('C:/Users/spsar/OneDrive/Desktop/oriImg.cv2.jpg')
+# to_pil_image(cv2Img).save('C:/Users/spsar/OneDrive/Desktop/oriImg.cv2.jpg')
 
-with open('C:/Users/spsar/OneDrive/Desktop/oriImg.jpg.json', "w") as write:
-    json.dump(cv2Img.tolist(), write)
+# with open('C:/Users/spsar/OneDrive/Desktop/oriImg.jpg.json', "w") as write:
+#     json.dump(cv2Img.tolist(), write)
 
 
 
-video = pims.Video('C:/Users/spsar/capstone/samples/4010759\Animals/1. Dog/MVI_2978.MOV')
-to_pil_image(video[0]).save('C:/Users/spsar/OneDrive/Desktop/oriImg.pims.jpg')
-print(f'video[0] {type(video[0])} {video[0].shape}')
-with open('C:/Users/spsar/OneDrive/Desktop/oriImg-pims.jpg.jsom', "w") as write:
-    json.dump(video[0].tolist(), write)
+# video = pims.Video('C:/Users/spsar/capstone/samples/4010759\Animals/1. Dog/MVI_2978.MOV')
+# to_pil_image(video[0]).save('C:/Users/spsar/OneDrive/Desktop/oriImg.pims.jpg')
+# print(f'video[0] {type(video[0])} {video[0].shape}')
+# with open('C:/Users/spsar/OneDrive/Desktop/oriImg-pims.jpg.jsom', "w") as write:
+#     json.dump(video[0].tolist(), write)
 
-cv2Img_RGB = cv2.cvtColor(cv2Img, cv2.COLOR_BGR2RGB)
+# cv2Img_RGB = cv2.cvtColor(cv2Img, cv2.COLOR_BGR2RGB)
 
-oriImg=cv2Img_RGB#[:, :, ::-1]
+oriImg=videoframe0#[:, :, ::-1]
 ### ORIGINAL
 model_type = 'body25'  # 'coco'  #  
 if model_type=='body25':

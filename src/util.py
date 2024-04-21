@@ -340,15 +340,17 @@ def drawStickmodel(oriImg,x_ytupple,x_y_sticks,export_edges,export_peaks):
     edges = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [0, 9], [9, 10], \
                 [10, 11], [11, 12], [0, 13], [13, 14], [14, 15], [15, 16], [0, 17], [17, 18], [18, 19], [19, 20]]
 
-    for (ie,(x1, y1),(x2, y2)) in export_edges:
-        # print(f'new ax.plot([{x1}, {x2}], [{y1}, {y2}], color=matplotlib.colors.hsv_to_rgb([ie/float({len(edges)}), 1.0, 1.0]))')
-        ax.plot([x1, x2], [y1, y2], color=matplotlib.colors.hsv_to_rgb([ie/float(len(edges)), 1.0, 1.0]))
+    for both_hand_edges in export_edges:
+        for (ie,(x1, y1),(x2, y2)) in both_hand_edges:
+            # print(f'new ax.plot([{x1}, {x2}], [{y1}, {y2}], color=matplotlib.colors.hsv_to_rgb([ie/float({len(edges)}), 1.0, 1.0]))')
+            ax.plot([x1, x2], [y1, y2], color=matplotlib.colors.hsv_to_rgb([ie/float(len(edges)), 1.0, 1.0]))
 
     width, height = ax.figure.get_size_inches() * ax.figure.get_dpi()
 
-    for (x,y,text) in export_peaks:
-        # print(f"new ax.plot({x}, {y}, 'r.')")
-        ax.plot(x, y, 'r.')
+    for both_hand_peaks in export_peaks:
+        for (x,y,text) in both_hand_peaks:
+            # print(f"new ax.plot({x}, {y}, 'r.')")
+            ax.plot(x, y, 'r.')
 
 
 
