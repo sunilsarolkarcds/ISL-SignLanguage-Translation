@@ -117,7 +117,7 @@ import ffmpeg
 # parser.add_argument('--no_hands', action='store_true', help='No hand pose')
 # parser.add_argument('--no_body', action='store_true', help='No body pose')
 # args = parser.parse_args()
-video_file = "C:/Users/spsar/capstone/ISL-sign-language-recognition/4010759/Adjectives/9. Nice/MVI_9590.MOV"#args.file
+video_file = "C:/Users/spsar/capstone/ISL-sign-language-recognition/4010759/Adjectives/26. hard/MVI_9669.MOV"#args.file
 
 
 # get video file info
@@ -136,6 +136,8 @@ output_file = ".".join(video_file.split(".")[:-1])+".processed." + postfix
 isl_translator=ISLSignPosTranslator(body_estimation.model,hand_estimation.model,translation_model,input_fps, input_pix_fmt,
                         input_vcodec)
 
+isl_translator.save('model/isl-translate-v1.keras')
+# isl_translator.save('path/to/location.keras') 
 
 # video = pims.Video(video_file)
 
