@@ -117,7 +117,7 @@ output_file = ".".join(video_file.split(".")[:-1])+".processed." + postfix
 
 # isl_translator=ISLSignPosTranslator(body_estimation.model,hand_estimation.model,translation_model,input_fps, input_pix_fmt,
 #                         input_vcodec)
-isl_translator=ISLSignPosTranslator(body_model=bodypose_25_model(),hand_model=handpose_model(), translation_model=translation_model)
+isl_translator=ISLSignPosTranslator(bodypose_25_model(),handpose_model(), translation_model)
 isl_translator.load_weights('model/isl-translate-v1.keras')
 # isl_translator.save('model/isl-translate-v1.keras')
 # isl_translator.save('path/to/location.keras') 
