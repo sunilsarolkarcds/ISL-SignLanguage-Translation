@@ -306,23 +306,18 @@ class ISLSignPos(keras.Model):
         return np.array(all_peaks)
     
 class ISLSignPosTranslator(keras.Model):
-    def __init__(self,pt_body_model,pt_hand_model, translation_model,input_fps, input_pix_fmt,
-                        input_vcodec):
+    
+    def __init__(self,body_model,hand_model, translation_model):
         super().__init__()
-        self.pt_body = TorchModuleWrapper(pt_body_model)
+        self.pt_body = TorchModuleWrapper(body_model)
         self.pt_body.trainable=False
-        self.pt_hand = TorchModuleWrapper(pt_hand_model)
+        self.pt_hand = TorchModuleWrapper(hand_model)
         self.pt_hand.trainable=False
+        
         self.njoint_body = 26
         self.npaf_body = 52
         self.model_type='body25'
         self.translation_layer=translation_model
-        self.window=np.zeros((20,156))
-
-        self.input_fps=input_fps
-        self.input_pix_fmt=input_pix_fmt
-        self.input_vcodec=input_vcodec
-        self.writer=None
 
     def call(self, window):
         window_size=20
@@ -345,15 +340,6 @@ class ISLSignPosTranslator(keras.Model):
 
             feature=self.populate_features(bodypose_circles,handpose_peaks)
             window_features.append(feature)
-
-            # if self.writer is None:
-            #     input_framesize = frame.cpu().numpy().shape[:2]
-            #     self.writer = Writer('C:/Users/spsar/OneDrive/Desktop/test_output.MOV', self.input_fps, input_framesize, self.input_pix_fmt,
-            #                     self.input_vcodec)
-            
-            # canvas=util.drawStickmodel(frame.cpu().numpy(),bodypose_circles,bodypose_sticks,handpose_edges,handpose_peaks)
-            # self.writer(canvas)
-            # cv2.imwrite(f'C:/Users/spsar/OneDrive/Desktop/test/test-output-{idx}.jpg', frame.cpu().numpy()) 
         
         if len(window_features)<window_size:
             for _ in range(0,(window_size-window_features.shape[0])):
