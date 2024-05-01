@@ -44,7 +44,7 @@ def transfer(model, model_weights):
     return transfered_model_weights
 
 # draw the body keypoint and lims
-def draw_bodypose(canvas, candidate, subset, model_type='coco'):
+def draw_bodypose(canvas, candidate, subset, model_type='body25'):
     stickwidth = 4
     if model_type == 'body25':
         limbSeq = [[1,0],[1,2],[2,3],[3,4],[1,5],[5,6],[6,7],[1,8],[8,9],[9,10],\

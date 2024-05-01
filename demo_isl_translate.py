@@ -20,8 +20,16 @@ import pims
 from keras.models import Sequential
 import os
 from keras.models import Sequential
-from keras.layers import LSTM, Dense, Bidirectional, Dropout,Input,LayerNormalization
 import pickle
+import keras
+from keras.models import Sequential
+import os
+from keras.models import Sequential
+from keras.layers import LSTM, Dense, Bidirectional, Dropout,Input,BatchNormalization
+
+from src.expression_mapping import expression_mapping
+import cv2
+
 
 class FFProbeResult(NamedTuple):
     return_code: int
@@ -40,9 +48,9 @@ def ffprobe(file_path) -> FFProbeResult:
     return FFProbeResult(return_code=result.returncode,
                          json=result.stdout,
                          error=result.stderr)
-label_expression_mapping={}
-with open('./model/label_expression_mapping.pkl', 'rb') as f:
-    label_expression_mapping = pickle.load(f)
+# label_expression_mapping={}
+# with open('./model/label_expression_mapping.pkl', 'rb') as f:
+#     label_expression_mapping = pickle.load(f)
 # openpose setup
 from src import model
 from src import util
@@ -59,31 +67,44 @@ hand_estimation = Hand('model/hand_pose_model.pth')
 # translation_model = keras.models.load_model('./model/model.weights.h5')
 
 
+# translation_model = Sequential()
+# translation_model.add(Input(shape=(20, 156)))
 translation_model = Sequential()
-translation_model.add(Input(shape=(12, 13)))
-translation_model.add(LayerNormalization())
-translation_model.add(Bidirectional(LSTM(256, return_sequences=True)))
-translation_model.add(Dropout(0.5))
-translation_model.add(Bidirectional(LSTM(128, return_sequences=True)))
-translation_model.add(Dropout(0.3))
-translation_model.add(Bidirectional(LSTM(64, return_sequences=False)))
-translation_model.add(Dropout(0.3))
-translation_model.add(Dense(128, activation='relu'))
+translation_model.add(Input(shape=((20, 156))))
+translation_model.add(keras.layers.Masking(mask_value=0.))
+translation_model.add(BatchNormalization())
+translation_model.add(Bidirectional(LSTM(32, recurrent_dropout=0.2, return_sequences=True)))
+# model.add(BatchNormalization())
+# model.add(BatchNormalization()) <--- Does not help much and reduces accuracy
+# model.add(Bidirectional(LSTM(64, return_sequences=True)))
 translation_model.add(Dropout(0.2))
-
-translation_model.add(Dense(64, activation='relu'))
+translation_model.add(Bidirectional(LSTM(32, recurrent_dropout=0.2)))
+# model.add(BatchNormalization())
+translation_model.add(keras.layers.Activation('elu'))
+translation_model.add(Dense(32, use_bias=False, kernel_initializer='he_normal'))
+# model.add(Dense(32, kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
+#     bias_regularizer=regularizers.L2(1e-4),
+#     activity_regularizer=regularizers.L2(1e-5)), kernel_initializer='he_normal',use_bias=False)
+# model.add(keras.layers.LeakyReLU(alpha=0.2))
+translation_model.add(BatchNormalization())
 translation_model.add(Dropout(0.2))
-translation_model.add(Dense(170, activation='softmax'))
-translation_model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-translation_model.load_weights('./model/isl-translate.keras')
+translation_model.add(keras.layers.Activation('elu'))
+translation_model.add(Dense(32, kernel_initializer='he_normal',use_bias=False))
+# model.add(Dense(32, kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
+#     bias_regularizer=regularizers.L2(1e-4),
+#     activity_regularizer=regularizers.L2(1e-5)), kernel_initializer='he_normal',use_bias=False)
+translation_model.add(BatchNormalization())
+translation_model.add(keras.layers.Activation('elu'))
+translation_model.add(Dropout(0.2))
+translation_model.add(Dense(len(list(expression_mapping.keys())), activation='softmax'))
+translation_model.load_weights('model/isl_model_final.keras')
 
-isl_translator=ISLSignPosTranslator(body_estimation.model,hand_estimation.model,translation_model)
 
 
-def process_frame(frame):
-    # canvas = copy.deepcopy(frame)
+# def process_frame(frame):
+#     # canvas = copy.deepcopy(frame)
     
-    return isl_translator(frame)
+#     return isl_translator(frame)
 
 # writing video with ffmpeg because cv2 writer failed
 # https://stackoverflow.com/questions/61036822/opencv-videowriter-produces-cant-find-starting-number-error
@@ -96,7 +117,8 @@ import ffmpeg
 # parser.add_argument('--no_hands', action='store_true', help='No hand pose')
 # parser.add_argument('--no_body', action='store_true', help='No body pose')
 # args = parser.parse_args()
-video_file = "C:/Users/spsar/capstone/ISL-sign-language-recognition/4010759/Adjectives/31. Strong/MVI_9572.MOV"#args.file
+video_file = "C:/Users/spsar/capstone/ISL-sign-language-recognition/4010759/Adjectives/9. Nice/MVI_9590.MOV"#args.file
+
 
 # get video file info
 ffprobe_result = ffprobe(video_file)
@@ -111,6 +133,13 @@ input_vcodec = videoinfo["codec_name"]
 postfix = info["format"]["format_name"].split(",")[0]
 output_file = ".".join(video_file.split(".")[:-1])+".processed." + postfix
 
+isl_translator=ISLSignPosTranslator(body_estimation.model,hand_estimation.model,translation_model,input_fps, input_pix_fmt,
+                        input_vcodec)
+
+
+# video = pims.Video(video_file)
+
+window_size=20
 
 class Writer():
     def __init__(self, output_file, input_fps, input_framesize, input_pix_fmt,
@@ -136,15 +165,44 @@ class Writer():
         self.ff_proc.stdin.close()
         self.ff_proc.wait()
 
-
 writer = None
-video = pims.Video(video_file)
-totalFrames=len(video)
-for idx,frame in enumerate(video):
-    encoded_translation = process_frame(frame[:, :, ::-1])
-    # print(encoded_translation[0])
-    encoded_translation=encoded_translation[0].cpu().detach().numpy()
-    maxindex=np.argmax(encoded_translation)
-    print(f'{encoded_translation[maxindex]:0.4f} {label_expression_mapping[maxindex]}')
+window=[]
+cap = cv2.VideoCapture(video_file,)
+totalFrames=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+for idx in range(totalFrames):#enumerate(file_df.rolling(window=20, step=20,min_periods=1)):
+    print(f'captured frame#{idx}')
+    if(cap.isOpened()):
+        ret, frame = cap.read()
+
+    # if writer is None:
+    #     input_framesize = frame.shape[:2]
+    #     writer = Writer(output_file, input_fps, input_framesize, input_pix_fmt,
+    #                     input_vcodec)
+
+    if len(window)<window_size:
+        window.append(frame)
+    else:
+        window[:-1] = window[1:]
+        window[-1]=frame
+        # print('processing window')
+        # for _frame in window:
+        #     # print('writing frame')
+        #     writer(_frame)
+        encoded_translation = isl_translator(np.array(window))
+        # print(encoded_translation[0])
+        encoded_translation=encoded_translation[0].cpu().detach().numpy()
+        sorted_index=np.argsort(encoded_translation)[::-1]
+        maxindex=np.argmax(encoded_translation)
+        print(f'{idx} {encoded_translation[maxindex]:0.4f} {maxindex}-{expression_mapping[maxindex]} ')#{[(pi,encoded_translation[pi],expression_mapping[pi]) for pi in sorted_index]}
+
+# isl_translator.closeWriter()
+# writer.close()
+cap.release()
+# for idx,frame in enumerate(video):
+#     encoded_translation = process_frame(frame[:, :, ::-1])
+#     # print(encoded_translation[0])
+#     encoded_translation=encoded_translation[0].cpu().detach().numpy()
+#     maxindex=np.argmax(encoded_translation)
+#     print(f'{idx} {encoded_translation[maxindex]:0.4f} {maxindex}-{expression_mapping[maxindex]}')
 
 

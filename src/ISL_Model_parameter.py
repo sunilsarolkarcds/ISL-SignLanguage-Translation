@@ -5,11 +5,38 @@ import cv2
 import torch
 from scipy.ndimage.filters import gaussian_filter
 import math
-
-
+import os
+import ffmpeg
 import numpy as np
 from skimage.measure import label
 import src.util as util
+import copy
+
+class Writer():
+    def __init__(self, output_file, input_fps, input_framesize, input_pix_fmt,
+                 input_vcodec):
+        if os.path.exists(output_file):
+            os.remove(output_file)
+        self.ff_proc = (
+            ffmpeg
+            .input('pipe:',
+                   format='rawvideo',
+                   pix_fmt="bgr24",
+                   s='%sx%s'%(input_framesize[1],input_framesize[0]),
+                   r=input_fps)
+            .output(output_file, pix_fmt=input_pix_fmt, vcodec=input_vcodec)
+            .overwrite_output()
+            .run_async(pipe_stdin=True)
+        )
+
+    def __call__(self, frame):
+        self.ff_proc.stdin.write(frame.tobytes())
+
+    def close(self):
+        self.ff_proc.stdin.close()
+        self.ff_proc.wait()
+
+writer = None
 
 class ISLSignPos(keras.Model):
     def __init__(self,pt_body_model,pt_hand_model):
@@ -279,7 +306,8 @@ class ISLSignPos(keras.Model):
         return np.array(all_peaks)
     
 class ISLSignPosTranslator(keras.Model):
-    def __init__(self,pt_body_model,pt_hand_model, translation_model):
+    def __init__(self,pt_body_model,pt_hand_model, translation_model,input_fps, input_pix_fmt,
+                        input_vcodec):
         super().__init__()
         self.pt_body = TorchModuleWrapper(pt_body_model)
         self.pt_body.trainable=False
@@ -289,24 +317,82 @@ class ISLSignPosTranslator(keras.Model):
         self.npaf_body = 52
         self.model_type='body25'
         self.translation_layer=translation_model
+        self.window=np.zeros((20,156))
 
-    def call(self, frame):
-        candidate, subset = self.bodypos(frame.cpu().numpy())
-        hands_list = util.handDetect(candidate, subset, frame.cpu().numpy())
-        all_hand_peaks = []
-        for x, y, w, is_left in hands_list:
-            peaks = self.handpos(frame.cpu().numpy()[y:y+w, x:x+w, :])
-            peaks[:, 0] = np.where(peaks[:, 0]==0, peaks[:, 0], peaks[:, 0]+x)
-            peaks[:, 1] = np.where(peaks[:, 1]==0, peaks[:, 1], peaks[:, 1]+y)
-            all_hand_peaks.append(peaks)
+        self.input_fps=input_fps
+        self.input_pix_fmt=input_pix_fmt
+        self.input_vcodec=input_vcodec
+        self.writer=None
 
-        (bodypose_circles,bodypose_sticks,)=util.get_bodypose(candidate, subset, self.model_type)
-        (handpose_edges,handpose_peaks)=util.get_handpose(all_hand_peaks,)
+    def call(self, window):
+        window_size=20
+        window_features=[]
+        blank_frame=np.zeros((1,156))
+        for idx,frame in enumerate(window.cpu()):
 
-        feature=self.populate_features(bodypose_circles,handpose_peaks)
-        return self.translation_layer(feature)
+            # frame=frame.cpu().numpy()[:, :, ::-1]
+            candidate, subset = self.bodypos(frame.cpu().numpy())
+            hands_list = util.handDetect(candidate, subset, frame.cpu().numpy())
+            all_hand_peaks = []
+            for x, y, w, is_left in hands_list:
+                peaks = self.handpos(frame.cpu().numpy()[y:y+w, x:x+w, :])
+                peaks[:, 0] = np.where(peaks[:, 0]==0, peaks[:, 0], peaks[:, 0]+x)
+                peaks[:, 1] = np.where(peaks[:, 1]==0, peaks[:, 1], peaks[:, 1]+y)
+                all_hand_peaks.append(peaks)
+
+            (bodypose_circles,bodypose_sticks,)=util.get_bodypose(candidate, subset, self.model_type)
+            (handpose_edges,handpose_peaks)=util.get_handpose(all_hand_peaks,)
+
+            feature=self.populate_features(bodypose_circles,handpose_peaks)
+            window_features.append(feature)
+
+            # if self.writer is None:
+            #     input_framesize = frame.cpu().numpy().shape[:2]
+            #     self.writer = Writer('C:/Users/spsar/OneDrive/Desktop/test_output.MOV', self.input_fps, input_framesize, self.input_pix_fmt,
+            #                     self.input_vcodec)
+            
+            # canvas=util.drawStickmodel(frame.cpu().numpy(),bodypose_circles,bodypose_sticks,handpose_edges,handpose_peaks)
+            # self.writer(canvas)
+            # cv2.imwrite(f'C:/Users/spsar/OneDrive/Desktop/test/test-output-{idx}.jpg', frame.cpu().numpy()) 
+        
+        if len(window_features)<window_size:
+            for _ in range(0,(window_size-window_features.shape[0])):
+                window_features.append(blank_frame)
+
+
+        # self.writer.close()
+        # timeseries=self.create_timeseries_data(feature)
+        # self.frame_to_window(feature)
+        np.savetxt('C:/Users/spsar/OneDrive/Desktop/test/MVI_9590.MOV.window1.numpy',np.array(window_features))
+        return self.translation_layer(np.array(window_features).reshape(1,20,156))
+    
+
+    def frame_to_window(self,frame):
+        """
+        Converts a single frame to a rolling window array with zero padding.
+
+        Args:
+            frame: A numpy array representing a video frame.
+            window_size: The size of the rolling window (default: 20).
+            window (optional): An existing window array to add the frame to 
+                                (useful for maintaining rolling window state).
+
+        Returns:
+            A numpy array representing the rolling window with the added frame.
+        """
+   
+        # Shift the window elements by 1 (oldest frame is dropped)
+        self.window[:-1] = self.window[1:]
+
+        # Add the new frame to the end of the window
+        self.window[-1] = frame
     
     def populate_features(self,bodypose_circles,handpose_peaks):
+        # X_body_test = [f'bodypeaks_x_{i}' for i in range(15)] + [f'bodypeaks_y_{i}' for i in range(15)]
+        # X_hand0_test = [f'hand0peaks_x_{i}' for i in range(21)] + [f'hand0peaks_y_{i}' for i in range(21)] + [f'hand0peaks_peaktxt{i}' for i in range(21)]
+        # X_hand1_test = [f'hand1peaks_x_{i}' for i in range(21)] + [f'hand1peaks_y_{i}' for i in range(21)] + [f'hand1peaks_peaktxt{i}' for i in range(21)]
+
+        # feature_columns_new = X_body_test + X_hand0_test + X_hand1_test
         feature=[]
         for idx in range(15):
             if(idx<len(bodypose_circles)):
@@ -334,7 +420,7 @@ class ISLSignPosTranslator(keras.Model):
                     feature.append(0)
 
             for idx in range(21):
-                if(idx<len(handpose_peaks[hand_idx][idx])):
+                if(idx<len(handpose_peaks[hand_idx])):
                     feature.append(float(handpose_peaks[hand_idx][idx][2]))
                 else:
                     feature.append(0)
@@ -365,10 +451,10 @@ class ISLSignPosTranslator(keras.Model):
         #         feature[f'hand{idx}edge_y2_{peaktxt}']=handedge_y2
 
         X=np.array(feature)
-        time_steps = 12  # Number of time steps
-        num_features = X.shape[0] // time_steps  # Number of features per time step
-        X_reshaped = X.reshape(1,time_steps, num_features)
-        return X_reshaped
+        # time_steps = 12  # Number of time steps
+        # num_features = X.shape[0] // time_steps  # Number of features per time step
+        # X_reshaped = X.reshape(1,time_steps, num_features)
+        return X
     
     def bodypos(self, oriImg):
         model_type = 'body25'

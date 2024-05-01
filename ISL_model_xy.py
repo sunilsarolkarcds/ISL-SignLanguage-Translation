@@ -21,10 +21,14 @@ import matplotlib.pyplot as plt
 import torch
 import pims
 from torchvision.transforms.functional import to_pil_image
+import os
+os.environ["KERAS_BACKEND"] = "torch"
+import keras
+print(keras.__version__)
 
 filepath='C:/Users/spsar/capstone/samples/features/transforms/Animals/Dog/MVI_2978-original/MVI_2978-0.jpg'
 
-videopath='D:/4010759/Home/24. Table/MVI_9002.MP4'
+videopath='C:/Users/spsar/capstone/ISL-sign-language-recognition/4010759/Adjectives/9. Nice/MVI_9590.MOV'
 cap = cv2.VideoCapture(videopath)
 
 videoframe0=None
@@ -33,9 +37,10 @@ while(cap.isOpened()):
     videoframe0=frame
     break
 cap.release()
+oriImg=videoframe0
+# to_pil_image(videoframe0).save('C:/Users/spsar/OneDrive/Desktop/videoframe0.jpg')
 
-to_pil_image(videoframe0).save('C:/Users/spsar/OneDrive/Desktop/videoframe0.jpg')
-print(f'videoframe0 {type(videoframe0)} {frame.shape}')
+# print(f'videoframe0 {type(videoframe0)} {frame.shape}')
 
 filename=videopath.split('/')[-1]
 directory_path=os.path.dirname(videopath)
@@ -49,15 +54,15 @@ directory_path=os.path.dirname(videopath)
 
 
 
-# video = pims.Video('C:/Users/spsar/capstone/samples/4010759\Animals/1. Dog/MVI_2978.MOV')
-# to_pil_image(video[0]).save('C:/Users/spsar/OneDrive/Desktop/oriImg.pims.jpg')
+# video = pims.Video(videopath)
+# to_pil_image(video[0]).save('C:/Users/spsar/OneDrive/Desktop/test/oriImg.pims.jpg')
 # print(f'video[0] {type(video[0])} {video[0].shape}')
-# with open('C:/Users/spsar/OneDrive/Desktop/oriImg-pims.jpg.jsom', "w") as write:
+# with open('C:/Users/spsar/OneDrive/Desktop/test/oriImg-pims.jpg.jsom', "w") as write:
 #     json.dump(video[0].tolist(), write)
 
-# cv2Img_RGB = cv2.cvtColor(cv2Img, cv2.COLOR_BGR2RGB)
+# # cv2Img_RGB = cv2.cvtColor(cv2Img, cv2.COLOR_BGR2RGB)
 
-oriImg=videoframe0#[:, :, ::-1]
+# oriImg=video[0][:, :, ::-1]
 ### ORIGINAL
 model_type = 'body25'  # 'coco'  #  
 if model_type=='body25':
@@ -68,6 +73,76 @@ body_estimation = Body(model_path, model_type)
 hand_estimation = Hand('model/hand_pose_model.pth')
 
 isl=ISLSignPos(body_estimation.model,hand_estimation.model)
+
+######
+def populate_features(bodypose_circles,handpose_peaks):
+        # X_body_test = [f'bodypeaks_x_{i}' for i in range(15)] + [f'bodypeaks_y_{i}' for i in range(15)]
+        # X_hand0_test = [f'hand0peaks_x_{i}' for i in range(21)] + [f'hand0peaks_y_{i}' for i in range(21)] + [f'hand0peaks_peaktxt{i}' for i in range(21)]
+        # X_hand1_test = [f'hand1peaks_x_{i}' for i in range(21)] + [f'hand1peaks_y_{i}' for i in range(21)] + [f'hand1peaks_peaktxt{i}' for i in range(21)]
+
+        # feature_columns_new = X_body_test + X_hand0_test + X_hand1_test
+        feature=[]
+        for idx in range(15):
+            if(idx<len(bodypose_circles)):
+                feature.append(bodypose_circles[idx][0])
+            else:
+                feature.append(0)
+        
+        for idx in range(15):
+            if(idx<len(bodypose_circles)):
+                feature.append(bodypose_circles[idx][1])
+            else:
+                feature.append(0)
+
+        for hand_idx in range(2):
+            for idx in range(21):
+                if(idx<len(handpose_peaks[hand_idx])):
+                    feature.append(float(handpose_peaks[hand_idx][idx][0]))
+                else:
+                    feature.append(0)
+
+            for idx in range(21):
+                if(idx<len(handpose_peaks[hand_idx])):
+                    feature.append(float(handpose_peaks[hand_idx][idx][1]))
+                else:
+                    feature.append(0)
+
+            for idx in range(21):
+                if(idx<len(handpose_peaks[hand_idx])):
+                    feature.append(float(handpose_peaks[hand_idx][idx][2]))
+                else:
+                    feature.append(0)
+
+        # for idx in range(21):
+        #     if(idx<len(handpose_peaks[1])):
+        #         feature.append(handpose_peaks[1][idx][0])
+        #     else:
+        #         feature.append(0)
+        
+        # for idx in range(21):
+        #     if(idx<len(handpose_peaks[1])):
+        #         feature.append(handpose_peaks[1][idx][1])
+        #     else:
+        #         feature.append(0)
+
+        # for idx in range(21):
+        #     if(idx<len(handpose_peaks[1])):
+        #         feature.append(handpose_peaks[1][idx][2])
+        #     else:
+        #         feature.append(0)
+
+        # for idx,handedges in enumerate(handpose_edges):
+        #     for (peaktxt, (handedge_x1, handedge_y1), (handedge_x2, handedge_y2)) in handedges:
+        #         feature[f'hand{idx}edge_x1_{peaktxt}']=handedge_x1
+        #         feature[f'hand{idx}edge_y1_{peaktxt}']=handedge_y1
+        #         feature[f'hand{idx}edge_x2_{peaktxt}']=handedge_x2
+        #         feature[f'hand{idx}edge_y2_{peaktxt}']=handedge_y2
+
+        X=np.array(feature)
+        # time_steps = 12  # Number of time steps
+        # num_features = X.shape[0] // time_steps  # Number of features per time step
+        # X_reshaped = X.reshape(1,time_steps, num_features)
+        return X
 
 
 ######
@@ -84,6 +159,9 @@ with open(os.path.join(directory_path, f'{filename}.json'), "w") as write:
 x_ytupple,x_y_sticks=util.get_bodypose(isl_candidate,isl_subset,model_type)
 # ((x1, y1),(x2, y2)),(x,y,txt)=util.get_handpose(all_hand_peaks)
 (export_edges,export_peaks)=util.get_handpose(isl_all_hand_peaks)
+
+features=populate_features(x_ytupple,export_peaks)
+np.savetxt('C:/Users/spsar/OneDrive/Desktop/test/MVI_9590.MOV.frame1.cv2.numpy',features)
 
 
 canvas=util.drawStickmodel(oriImg,x_ytupple,x_y_sticks,export_edges,export_peaks)
@@ -142,7 +220,7 @@ canvas=util.drawStickmodel(oriImg,x_ytupple,x_y_sticks,export_edges,export_peaks
 # ####
 
 
-cv2.imwrite('C:/Users/spsar/OneDrive/Desktop/MVI_2978-0.jpg-modified.jpg', canvas) 
+cv2.imwrite('C:/Users/spsar/OneDrive/Desktop/test/MVI_2978-0.jpg-modified.jpg', canvas) 
 
 
 print("Finished")
